@@ -5,16 +5,17 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
+from src.formatting import format_currency
 from src.ui import render_section_header
 
 
 TRANSACTION_TYPES = ["Buy", "Sell", "Dividend", "Profit", "Initial"]
 CURRENCIES = ["EUR", "USD"]
+POSITION_TYPES = {"Buy", "Sell", "Initial"}
 
 
 def render_transaction_form(portfolio: pd.DataFrame) -> None:
     render_section_header("Invoer", "Nieuwe transactie")
-    _ensure_transaction_state()
 
     ticker_options = sorted(portfolio["Ticker"].unique())
     with st.container(border=True):
@@ -27,80 +28,73 @@ def render_transaction_form(portfolio: pd.DataFrame) -> None:
         with currency_col:
             currency = st.selectbox("Valuta", CURRENCIES)
 
-        amount_col, price_col, total_col = st.columns(3, gap="medium")
-        with amount_col:
-            st.number_input(
-                "Aantal",
-                min_value=0.0,
-                step=0.01,
-                format="%.8f",
-                key="tx_amount",
-                on_change=_recalculate_from_amount,
-            )
-        with price_col:
-            st.number_input(
-                "Prijs per stuk",
-                min_value=0.0,
-                step=1.0,
-                format="%.4f",
-                key="tx_price",
-                on_change=_recalculate_from_price,
-            )
-        with total_col:
-            st.number_input(
-                "Totaal",
-                min_value=0.0,
-                step=10.0,
-                format="%.2f",
-                key="tx_total",
-                on_change=_recalculate_from_total,
-            )
+        amount, price, total = _render_transaction_amounts(transaction_type, currency)
 
     payload = {
         "Datum": datum.strftime("%d-%m-%Y"),
         "Ticker": ticker,
         "Type": transaction_type,
-        "Aantal": float(st.session_state.tx_amount),
-        "Prijs per stuk": float(st.session_state.tx_price),
-        "Totaal": float(st.session_state.tx_total),
+        "Aantal": amount,
+        "Prijs per stuk": price,
+        "Totaal": total,
         "Valuta": currency,
     }
     _render_transaction_preview(payload)
 
 
-def _ensure_transaction_state() -> None:
-    st.session_state.setdefault("tx_amount", 0.0)
-    st.session_state.setdefault("tx_price", 0.0)
-    st.session_state.setdefault("tx_total", 0.0)
+def _render_transaction_amounts(
+    transaction_type: str,
+    currency: str,
+) -> tuple[float, float, float]:
+    if transaction_type in POSITION_TYPES:
+        amount_col, total_col = st.columns(2, gap="medium")
+        with amount_col:
+            amount = st.number_input(
+                "Aantal",
+                min_value=0.0,
+                step=0.01,
+                format="%.8f",
+                key="tx_amount_position",
+            )
+        with total_col:
+            total = st.number_input(
+                "Totaal",
+                min_value=0.0,
+                step=25.0,
+                format="%.2f",
+                key="tx_total_position",
+                help="Inclusief eventuele transactiekosten.",
+            )
+
+        price = _calculate_price_per_unit(amount, total)
+        st.metric("Prijs per stuk", format_currency(price, currency, decimals=4))
+        st.caption("Berekend uit Aantal en Totaal.")
+        return float(amount), price, float(total)
+
+    total = st.number_input(
+        "Totaal",
+        min_value=0.0,
+        step=25.0,
+        format="%.2f",
+        key="tx_total_cashflow",
+        help="Inclusief eventuele kosten.",
+    )
+    with st.expander("Optioneel"):
+        amount = st.number_input(
+            "Aantal",
+            min_value=0.0,
+            step=0.01,
+            format="%.8f",
+            key="tx_amount_cashflow",
+        )
+    price = _calculate_price_per_unit(amount, total)
+    return float(amount), price, float(total)
 
 
-def _recalculate_from_amount() -> None:
-    amount = float(st.session_state.tx_amount)
-    price = float(st.session_state.tx_price)
-    total = float(st.session_state.tx_total)
-
-    if amount <= 0:
-        return
-    if price > 0:
-        st.session_state.tx_total = round(amount * price, 2)
-    elif total > 0:
-        st.session_state.tx_price = round(total / amount, 4)
-
-
-def _recalculate_from_price() -> None:
-    amount = float(st.session_state.tx_amount)
-    price = float(st.session_state.tx_price)
-
-    if amount > 0 and price > 0:
-        st.session_state.tx_total = round(amount * price, 2)
-
-
-def _recalculate_from_total() -> None:
-    amount = float(st.session_state.tx_amount)
-    total = float(st.session_state.tx_total)
-
-    if amount > 0 and total > 0:
-        st.session_state.tx_price = round(total / amount, 4)
+def _calculate_price_per_unit(amount: float, total: float) -> float:
+    if amount <= 0 or total <= 0:
+        return 0.0
+    return round(total / amount, 4)
 
 
 def _render_transaction_preview(payload: dict[str, object]) -> None:
@@ -109,31 +103,28 @@ def _render_transaction_preview(payload: dict[str, object]) -> None:
 
     with st.container(border=True):
         if errors:
-            st.warning("Vul minimaal Aantal en Prijs per stuk of Totaal in.")
+            st.warning("Controleer de invoer voordat je de preview bevestigt.")
             for error in errors:
                 st.caption(error)
             return
 
         st.dataframe(pd.DataFrame([payload]), hide_index=True, width="stretch")
         confirmed = st.checkbox("Ik bevestig deze preview", key="tx_confirmed")
-        if st.button("Bevestig mock-transactie", disabled=not confirmed):
-            st.success("Preview bevestigd. Er is niets opgeslagen in fase 2.")
+        if st.button("Bevestig preview", disabled=not confirmed):
+            st.success("Preview bevestigd. Er is niets opgeslagen.")
 
 
 def _validate_transaction(payload: dict[str, object]) -> list[str]:
     errors: list[str] = []
     transaction_type = str(payload["Type"])
     amount = float(payload["Aantal"])
-    price = float(payload["Prijs per stuk"])
     total = float(payload["Totaal"])
 
     if not str(payload["Ticker"]).strip():
         errors.append("Ticker is verplicht.")
-    if transaction_type in {"Initial", "Buy", "Sell"} and amount <= 0:
-        errors.append("Aantal moet groter zijn dan 0 voor Initial, Buy en Sell.")
-    if transaction_type in {"Initial", "Buy", "Sell"} and price <= 0:
-        errors.append("Prijs per stuk moet groter zijn dan 0 voor Initial, Buy en Sell.")
     if total <= 0:
         errors.append("Totaal moet groter zijn dan 0.")
+    if transaction_type in POSITION_TYPES and amount <= 0:
+        errors.append("Aantal moet groter zijn dan 0 voor Buy, Sell en Initial.")
 
     return errors

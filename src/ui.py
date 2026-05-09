@@ -27,30 +27,29 @@ HEADER_IMAGE = Path(__file__).resolve().parents[1] / "assets" / "header-placehol
 
 def render_app_header(title: str, phase_label: str) -> None:
     with st.container(border=True):
-        text_col, image_col = st.columns([1.15, 1], gap="large")
-        with text_col:
-            st.caption(f"{phase_label} / Mockdata")
-            st.title(title)
-            st.write("Mobiel dashboard voor vermogen, holdings en snelle invoer.")
-        with image_col:
-            st.image(str(HEADER_IMAGE), width="stretch")
+        st.image(str(HEADER_IMAGE), width="stretch")
+        title_col, status_col = st.columns([1, 0.36], gap="medium")
+        with title_col:
+            st.title(title, anchor=False)
+        with status_col:
+            st.caption("Mockdata")
+            st.caption("Laatste update: 09-05-2026")
 
 
 def render_section_header(kicker: str, title: str) -> None:
-    st.caption(kicker.upper())
-    st.subheader(title)
+    st.subheader(title, anchor=False)
 
 
 def render_metric_card(card: MetricCard) -> None:
     with st.container(border=True):
         st.metric(label=card.label, value=card.value, delta=card.delta)
-        if card.helper:
-            st.caption(card.helper)
         if card.performance:
             performance_line = " | ".join(
                 f"{metric.label}: {metric.value}" for metric in card.performance
             )
             st.caption(performance_line)
+        if card.helper:
+            st.caption(card.helper)
 
 
 def render_metric_grid(cards: Iterable[MetricCard], columns: int = 3) -> None:

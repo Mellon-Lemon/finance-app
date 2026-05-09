@@ -36,7 +36,7 @@ def main() -> None:
         render_dashboard(data.portfolio, data.saldi, data.historie, data.dividend_total)
 
     with portfolio_tab:
-        render_portfolio_table(data.portfolio)
+        render_portfolio_table(data.portfolio, data.historie)
 
     with transaction_tab:
         render_transaction_form(data.portfolio)

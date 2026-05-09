@@ -50,5 +50,5 @@ def _render_adjustment_form(saldi: pd.DataFrame) -> None:
             st.metric("Verschil", signed_currency(difference))
 
         confirmed = st.checkbox("Ik bevestig deze wijziging")
-        if st.button("Bevestig mock-wijziging", disabled=not confirmed):
-            st.success("Saldo-preview bevestigd. Er is niets opgeslagen in fase 2.")
+        if st.button("Preview wijziging", disabled=not confirmed):
+            st.success("Wijziging gecontroleerd. Er is niets opgeslagen.")

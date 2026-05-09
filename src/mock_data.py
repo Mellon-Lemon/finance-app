@@ -27,37 +27,37 @@ def _build_portfolio() -> pd.DataFrame:
         {
             "Categorie": "Crypto",
             "Ticker": "BTC",
-            "Aantal": 0.1842,
-            "Inleg": 7800.0,
-            "Koers": 53250.0,
+            "Aantal": 0.46499113,
+            "Inleg": 22000.0,
+            "Koers": 68036.56737280384,
         },
         {
             "Categorie": "Aandelen",
             "Ticker": "GOOGL",
-            "Aantal": 8.0,
-            "Inleg": 1050.0,
-            "Koers": 152.0,
+            "Aantal": 24.0,
+            "Inleg": 3400.0,
+            "Koers": 172.35,
         },
         {
             "Categorie": "Aandelen",
             "Ticker": "AMZN",
-            "Aantal": 10.0,
-            "Inleg": 1550.0,
-            "Koers": 168.0,
+            "Aantal": 18.0,
+            "Inleg": 2900.0,
+            "Koers": 184.20,
         },
         {
             "Categorie": "Aandelen",
             "Ticker": "MSFT",
-            "Aantal": 5.0,
-            "Inleg": 1700.0,
-            "Koers": 390.0,
+            "Aantal": 12.0,
+            "Inleg": 4100.0,
+            "Koers": 421.30,
         },
         {
-            "Categorie": "ETF",
+            "Categorie": "Aandelen",
             "Ticker": "TSWE",
-            "Aantal": 34.0,
-            "Inleg": 960.0,
-            "Koers": 31.5,
+            "Aantal": 144.0,
+            "Inleg": 5200.0,
+            "Koers": 41.86,
         },
     ]
     portfolio = pd.DataFrame(rows)
@@ -72,22 +72,36 @@ def _build_portfolio() -> pd.DataFrame:
 def _build_saldi() -> pd.DataFrame:
     return pd.DataFrame(
         [
-            {"Account": "Spaar", "Huidig Saldo": 4350.0},
-            {"Account": "Vakanties", "Huidig Saldo": 1250.0},
-            {"Account": "Vrije ruimte", "Huidig Saldo": 780.0},
+            {"Account": "Spaar", "Huidig Saldo": 15000.0},
+            {"Account": "Vakanties", "Huidig Saldo": 3800.0},
+            {"Account": "Vrije ruimte", "Huidig Saldo": 3023.16},
         ]
     )
 
 
 def _build_historie() -> pd.DataFrame:
-    dates = pd.date_range("2025-02-28", periods=15, freq="ME")
-    spaar = [3100, 3200, 3350, 3300, 3400, 3500, 3650, 3750, 3900, 4000, 4100, 4200, 4250, 4300, 4350]
-    vakanties = [850, 900, 940, 980, 1020, 1050, 1100, 1125, 1150, 1180, 1200, 1220, 1235, 1240, 1250]
-    vrije_ruimte = [500, 560, 620, 480, 530, 650, 700, 760, 620, 690, 730, 760, 790, 820, 780]
-    crypto = [6100, 5900, 6400, 7050, 7200, 7600, 7350, 7900, 8250, 8700, 9100, 8900, 9400, 9600, 9810]
-    degiro = [4050, 4300, 4550, 4700, 4900, 5100, 5350, 5480, 5660, 5830, 6010, 6160, 6350, 6550, 5917]
-    crypto_inleg = [5200, 5400, 5600, 5800, 6000, 6200, 6400, 6600, 6800, 7000, 7200, 7400, 7600, 7700, 7800]
-    degiro_inleg = [3600, 3800, 4000, 4200, 4400, 4600, 4800, 5000, 5150, 5300, 5450, 5600, 5750, 5900, 5260]
+    dates = pd.to_datetime(
+        [
+            "2025-07-31",
+            "2025-08-31",
+            "2025-09-30",
+            "2025-10-31",
+            "2025-11-30",
+            "2025-12-31",
+            "2026-01-31",
+            "2026-02-28",
+            "2026-03-31",
+            "2026-04-30",
+            "2026-05-09",
+        ]
+    )
+    spaar = [9800, 10250, 10800, 11250, 11800, 12500, 13200, 13800, 14350, 14800, 15000]
+    vakanties = [2300, 2400, 2550, 2700, 2900, 3100, 3250, 3400, 3550, 3700, 3800]
+    vrije_ruimte = [1780, 1920, 2050, 2190, 2350, 2500, 2680, 2825, 2920, 2980, 3023.16]
+    crypto = [23800, 25150, 24300, 26750, 28100, 29550, 28900, 30150, 30900, 31420, 31636.40]
+    degiro = [14200, 14800, 15150, 15850, 16250, 16900, 17200, 17680, 18150, 18410, 18535.44]
+    crypto_inleg = [18500, 19000, 19500, 20000, 20500, 21200, 21600, 21800, 22000, 22000, 22000]
+    degiro_inleg = [12500, 12900, 13200, 13600, 14000, 14500, 14900, 15200, 15400, 15600, 15600]
 
     historie = pd.DataFrame(
         {
@@ -99,7 +113,7 @@ def _build_historie() -> pd.DataFrame:
             "Crypto I.": crypto_inleg,
             "DeGiro W.": degiro,
             "DeGiro I.": degiro_inleg,
-            "BTC Aant.": [0.12, 0.125, 0.13, 0.135, 0.14, 0.145, 0.15, 0.155, 0.16, 0.165, 0.17, 0.174, 0.178, 0.181, 0.1842],
+            "BTC Aant.": [0.36, 0.38, 0.39, 0.405, 0.42, 0.435, 0.445, 0.452, 0.458, 0.462, 0.46499113],
         }
     )
     historie["Belegd Vermogen"] = historie["Crypto W."] + historie["DeGiro W."]
