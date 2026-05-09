@@ -48,7 +48,7 @@ class GoogleSheetsReadOnlyClient:
 
     def get_records(self, worksheet_name: str) -> list[dict[str, object]]:
         worksheet = self._get_spreadsheet().worksheet(worksheet_name)
-        return worksheet.get_all_records()
+        return worksheet.get_all_records(numericise_ignore=["all"])
 
     def try_get_records(self, worksheet_name: str) -> list[dict[str, object]]:
         try:

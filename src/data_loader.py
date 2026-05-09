@@ -8,12 +8,15 @@ from pathlib import Path
 from typing import Iterable
 
 import pandas as pd
+from dotenv import load_dotenv
 
 from src.mock_data import MockFinanceData, load_mock_data
 from src.sheets_client import GoogleSheetsReadOnlyClient
 
 
 LOGGER = logging.getLogger(__name__)
+ATTEMPTED_SHEETS = ["Portfolio", "Saldi", "Historie", "Transacties (optioneel)"]
+load_dotenv()
 
 PORTFOLIO_COLUMNS = [
     "Categorie",
@@ -43,27 +46,31 @@ HISTORIE_COLUMNS = [
 
 
 def load_finance_data() -> MockFinanceData:
-    _load_local_env()
+    diagnostics = build_google_sheets_diagnostics()
+    _log_google_sheets_diagnostics(diagnostics)
 
     try:
         client = GoogleSheetsReadOnlyClient.from_environment()
         data = load_google_sheets_data(client)
-        return replace(
+        return ensure_finance_data_contract(
             data,
             source_label="Live Google Sheets",
             source_message="Read-only data",
             source_warning="",
+            google_debug=diagnostics,
         )
     except Exception as exc:
-        LOGGER.info("Google Sheets data unavailable; using mockdata fallback: %s", exc)
+        safe_error = _safe_error_message(exc)
+        LOGGER.warning("Google Sheets laden faalt veilig: %s", safe_error)
         warning = ""
         if _google_config_present():
             warning = "Google Sheets kon niet worden gelezen. Mockdata fallback is actief."
-        return replace(
+        return ensure_finance_data_contract(
             load_mock_data(),
             source_label="Mockdata" if not warning else "Fallback actief",
             source_message="Lokale fallback",
             source_warning=warning,
+            google_debug={**diagnostics, "Foutmelding": safe_error},
         )
 
 
@@ -85,6 +92,65 @@ def load_google_sheets_data(client: GoogleSheetsReadOnlyClient) -> MockFinanceDa
         saldi=saldi,
         historie=historie,
         dividend_total=dividend_total,
+    )
+
+
+def ensure_finance_data_contract(
+    data: MockFinanceData,
+    *,
+    source_label: str | None = None,
+    source_message: str | None = None,
+    source_warning: str | None = None,
+    google_debug: dict[str, str] | None = None,
+) -> MockFinanceData:
+    values = {
+        "source_label": source_label
+        if source_label is not None
+        else getattr(data, "source_label", "Mockdata"),
+        "source_message": source_message
+        if source_message is not None
+        else getattr(data, "source_message", "Lokale fallback"),
+        "source_warning": source_warning
+        if source_warning is not None
+        else getattr(data, "source_warning", ""),
+        "google_debug": google_debug if google_debug is not None else getattr(data, "google_debug", {}),
+    }
+    try:
+        return replace(data, **values)
+    except (TypeError, ValueError):
+        return MockFinanceData(
+            portfolio=data.portfolio,
+            saldi=data.saldi,
+            historie=data.historie,
+            dividend_total=data.dividend_total,
+            **values,
+        )
+
+
+def build_google_sheets_diagnostics() -> dict[str, str]:
+    credentials_path = _credentials_path()
+    return {
+        "GOOGLE_SHEET_ID gevonden": _yes_no(bool(os.getenv("GOOGLE_SHEET_ID", "").strip())),
+        "GOOGLE_SERVICE_ACCOUNT_FILE gevonden": _yes_no(
+            bool(os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "").strip())
+        ),
+        "Credentials-pad gevonden": _yes_no(bool(credentials_path)),
+        "Credentials-pad": str(credentials_path) if credentials_path else "n.v.t.",
+        "Credentials-bestand bestaat": _yes_no(
+            credentials_path.exists() if credentials_path else False
+        ),
+        "Geprobeerde tabbladen": ", ".join(ATTEMPTED_SHEETS),
+        "Foutmelding": "",
+    }
+
+
+def _log_google_sheets_diagnostics(diagnostics: dict[str, str]) -> None:
+    LOGGER.warning(
+        "Google Sheets debug: GOOGLE_SHEET_ID gevonden=%s; "
+        "credentials-pad gevonden=%s; credentials-bestand bestaat=%s",
+        diagnostics["GOOGLE_SHEET_ID gevonden"],
+        diagnostics["Credentials-pad gevonden"],
+        diagnostics["Credentials-bestand bestaat"],
     )
 
 
@@ -197,11 +263,10 @@ def parse_number(value: object) -> float | None:
     )
     is_percentage = text.endswith("%")
     text = text.rstrip("%")
+    text = text.replace("'", "")
 
-    if "," in text and "." in text:
+    if "," in text:
         text = text.replace(".", "").replace(",", ".")
-    elif "," in text:
-        text = text.replace(",", ".")
     elif "." in text and _looks_like_dutch_thousands(text):
         text = text.replace(".", "")
 
@@ -223,6 +288,28 @@ def parse_date(value: object):
     if isinstance(value, int | float):
         return pd.to_datetime(value, unit="D", origin="1899-12-30", errors="coerce")
     return pd.to_datetime(value, dayfirst=True, errors="coerce")
+
+
+def _credentials_path() -> Path | None:
+    credentials_file = (
+        os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "").strip()
+        or os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+    )
+    if not credentials_file:
+        return None
+    return Path(credentials_file).expanduser()
+
+
+def _safe_error_message(exc: Exception) -> str:
+    message = str(exc) or exc.__class__.__name__
+    sheet_id = os.getenv("GOOGLE_SHEET_ID", "").strip()
+    if sheet_id:
+        message = message.replace(sheet_id, "[GOOGLE_SHEET_ID verborgen]")
+    return message
+
+
+def _yes_no(value: bool) -> str:
+    return "ja" if value else "nee"
 
 
 def _get_cell(record: dict[str, object], candidates: list[str]) -> object | None:
@@ -252,19 +339,6 @@ def _normalise_category(category: str, ticker: str) -> str:
     if category.strip().lower() == "crypto" or ticker.upper() == "BTC":
         return "Crypto"
     return "Aandelen"
-
-
-def _load_local_env() -> None:
-    env_path = Path(".env")
-    if not env_path.exists():
-        return
-
-    for line in env_path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
 def _google_config_present() -> bool:

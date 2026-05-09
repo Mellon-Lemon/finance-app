@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pandas as pd
 
@@ -14,6 +14,7 @@ class MockFinanceData:
     source_label: str = "Mockdata"
     source_message: str = "Lokale fallback"
     source_warning: str = ""
+    google_debug: dict[str, str] = field(default_factory=dict)
 
 
 def load_mock_data() -> MockFinanceData:
