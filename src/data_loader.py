@@ -16,6 +16,7 @@ from src.sheets_client import GoogleSheetsReadOnlyClient
 
 LOGGER = logging.getLogger(__name__)
 ATTEMPTED_SHEETS = ["Portfolio", "Saldi", "Historie", "Transacties (optioneel)"]
+DEBUG_UI_ENV = "PORTFOLIO_DEBUG_GOOGLE"
 load_dotenv()
 
 PORTFOLIO_COLUMNS = [
@@ -142,6 +143,10 @@ def build_google_sheets_diagnostics() -> dict[str, str]:
         "Geprobeerde tabbladen": ", ".join(ATTEMPTED_SHEETS),
         "Foutmelding": "",
     }
+
+
+def is_google_debug_ui_enabled() -> bool:
+    return os.getenv(DEBUG_UI_ENV, "").strip().lower() in {"1", "true", "yes", "ja"}
 
 
 def _log_google_sheets_diagnostics(diagnostics: dict[str, str]) -> None:

@@ -20,6 +20,7 @@ class MetricCard:
     helper: str = ""
     delta: str | None = None
     performance: tuple[PerformanceMetric, ...] = ()
+    variant: str = "standard"
 
 
 HEADER_IMAGE = Path(__file__).resolve().parents[1] / "assets" / "header-placeholder.svg"
@@ -38,7 +39,6 @@ def render_app_header(
             st.title(title, anchor=False)
         with status_col:
             st.caption(source_label)
-            st.caption(source_message)
 
 
 def render_section_header(kicker: str, title: str) -> None:
@@ -47,12 +47,32 @@ def render_section_header(kicker: str, title: str) -> None:
 
 def render_metric_card(card: MetricCard) -> None:
     with st.container(border=True):
-        st.metric(label=card.label, value=card.value, delta=card.delta)
-        if card.performance:
-            performance_line = " | ".join(
-                f"{metric.label}: {metric.value}" for metric in card.performance
+        st.caption(card.label)
+        st.markdown(
+            f'<div class="fc-kpi-value fc-kpi-value--{card.variant}">{card.value}</div>',
+            unsafe_allow_html=True,
+        )
+        if card.delta:
+            tone = "positive" if card.delta.startswith("+") else "neutral"
+            if card.delta.startswith("-"):
+                tone = "negative"
+            st.markdown(
+                f'<div class="fc-kpi-badge fc-kpi-badge--{tone}">{card.delta}</div>',
+                unsafe_allow_html=True,
             )
-            st.caption(performance_line)
+        if card.performance:
+            cols = st.columns(len(card.performance), gap="small")
+            for col, metric in zip(cols, card.performance):
+                with col:
+                    st.markdown(
+                        (
+                            '<div class="fc-submetric">'
+                            f'<span>{metric.label}</span>'
+                            f'<strong>{metric.value}</strong>'
+                            '</div>'
+                        ),
+                        unsafe_allow_html=True,
+                    )
         if card.helper:
             st.caption(card.helper)
 
@@ -76,7 +96,14 @@ def render_target_card(
 ) -> None:
     bounded_progress = max(0.0, min(progress, 1.0))
     with st.container(border=True):
-        st.metric(title, current_value)
+        st.caption(title)
+        st.markdown(
+            f'<div class="fc-target-value">{current_value}</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="fc-target-percent">{progress:.0%}</div>',
+            unsafe_allow_html=True,
+        )
+        st.progress(bounded_progress)
         st.caption(f"Doel: {target_value}")
-        st.progress(bounded_progress, text=f"{progress:.0%}")
-        st.caption(helper)

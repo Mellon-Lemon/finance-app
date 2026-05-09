@@ -57,7 +57,7 @@ def inject_global_styles() -> None:
                 border: 1px solid var(--fc-border);
                 border-radius: 8px;
                 box-shadow: var(--fc-shadow);
-                padding: 0.95rem;
+                padding: 1.05rem;
             }
 
             div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stVerticalBlock"] {
@@ -86,6 +86,94 @@ def inject_global_styles() -> None:
                 font-weight: 760;
             }
 
+            .fc-kpi-value {
+                color: var(--text-color);
+                font-size: 1.8rem;
+                font-weight: 850;
+                line-height: 1.08;
+                margin: 0.1rem 0 0.45rem;
+                white-space: nowrap;
+            }
+
+            .fc-kpi-value--primary {
+                font-size: 2.55rem;
+                letter-spacing: 0;
+                margin-top: 0.18rem;
+            }
+
+            .fc-kpi-value--secondary {
+                font-size: 1.7rem;
+            }
+
+            .fc-kpi-badge {
+                align-items: center;
+                border: 1px solid var(--fc-border-soft);
+                border-radius: 999px;
+                display: inline-flex;
+                font-size: 0.84rem;
+                font-weight: 800;
+                line-height: 1;
+                margin: 0 0 0.45rem;
+                padding: 0.36rem 0.58rem;
+                width: fit-content;
+            }
+
+            .fc-kpi-badge--positive {
+                background: rgba(22, 163, 74, 0.1);
+                color: #15803d;
+            }
+
+            .fc-kpi-badge--negative {
+                background: rgba(220, 38, 38, 0.1);
+                color: #b91c1c;
+            }
+
+            .fc-kpi-badge--neutral {
+                background: rgba(148, 163, 184, 0.12);
+                color: var(--fc-muted);
+            }
+
+            .fc-submetric {
+                background: rgba(148, 163, 184, 0.09);
+                border: 1px solid var(--fc-border-soft);
+                border-radius: 8px;
+                min-height: 3.1rem;
+                padding: 0.46rem 0.5rem;
+            }
+
+            .fc-submetric span {
+                color: var(--fc-muted);
+                display: block;
+                font-size: 0.72rem;
+                font-weight: 800;
+                line-height: 1.1;
+                margin-bottom: 0.18rem;
+            }
+
+            .fc-submetric strong {
+                color: var(--text-color);
+                display: block;
+                font-size: 0.78rem;
+                font-weight: 800;
+                line-height: 1.18;
+            }
+
+            .fc-target-value {
+                color: var(--text-color);
+                font-size: 1.45rem;
+                font-weight: 850;
+                line-height: 1.12;
+                margin: 0.08rem 0 0.15rem;
+            }
+
+            .fc-target-percent {
+                color: var(--fc-muted);
+                font-size: 0.88rem;
+                font-weight: 850;
+                line-height: 1;
+                margin-bottom: 0.1rem;
+            }
+
             div[data-testid="stHorizontalBlock"] {
                 gap: 0.75rem;
             }
@@ -96,7 +184,7 @@ def inject_global_styles() -> None:
 
             div[data-testid="stHorizontalBlock"] div[data-testid="column"] > div[data-testid="stVerticalBlockBorderWrapper"] {
                 height: 100%;
-                min-height: 7.6rem;
+                min-height: 8rem;
             }
 
             @media (max-width: 700px) {
@@ -114,6 +202,14 @@ def inject_global_styles() -> None:
 
                 div[data-testid="column"] {
                     width: 100% !important;
+                }
+
+                .fc-kpi-value--primary {
+                    font-size: 2.05rem;
+                }
+
+                .fc-kpi-value {
+                    white-space: normal;
                 }
             }
 

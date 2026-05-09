@@ -1,33 +1,33 @@
 # Portfolio
 
-Mobile-friendly Streamlit portfolio dashboard.
+Mobile-friendly Streamlit portfolio dashboard bovenop een bestaande Google Sheets + Google Apps Script finance engine.
 
-Fase 3 leest Google Sheets data read-only wanneer credentials beschikbaar zijn. Zonder geldige configuratie start de app automatisch met mockdata fallback.
+## Projectstatus
 
-## Starten
+Fase 3 is afgerond:
+
+- Google Sheets read-only integratie werkt.
+- Mockdata fallback blijft beschikbaar.
+- De app toont de actieve datamode: `Live Google Sheets`, `Mockdata` of `Fallback actief`.
+- Write-back is nog niet actief.
+
+Nog niet gebouwd:
+
+- transacties opslaan naar Google Sheets
+- saldi updaten in Google Sheets
+- bestaande Sheet-rijen wijzigen of verwijderen
+
+## Setup
+
+Installeer Python en maak daarna lokaal een virtual environment:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-python -m streamlit run app.py
 ```
 
-## Mockdata fallback
-
-De app gebruikt mockdata wanneer:
-
-- `.env` ontbreekt
-- `GOOGLE_SHEET_ID` ontbreekt
-- service-account credentials ontbreken
-- Google Sheets tijdelijk niet bereikbaar is
-- de verplichte tabs geen bruikbare data teruggeven
-
-De header toont de actieve databron: `Mockdata`, `Live Google Sheets` of `Fallback actief`.
-
-## Google Sheets read-only
-
-Maak lokaal een `.env` bestand op basis van `.env.example`:
+Maak een lokaal `.env` bestand op basis van `.env.example`:
 
 ```env
 GOOGLE_SHEET_ID=your-google-sheet-id
@@ -40,13 +40,27 @@ Plaats het service-account JSON-bestand lokaal, bijvoorbeeld:
 credentials/service-account.json
 ```
 
-De Google Sheet moet gedeeld worden met het `client_email` adres uit het service-account JSON-bestand.
+De Google Sheet moet gedeeld worden met het `client_email` adres uit dit service-account bestand.
 
-Fase 3 gebruikt alleen read-only toegang. De app schrijft nog niets naar Google Sheets.
+## Starten
 
-## Gelezen tabs
+```powershell
+python -m streamlit run app.py
+```
 
-Verplicht read-only:
+## Datamodes
+
+De app kiest automatisch de best beschikbare databron:
+
+- `Live Google Sheets`: `.env`, credentials en Sheet zijn geldig.
+- `Mockdata`: er is geen Google configuratie aanwezig.
+- `Fallback actief`: Google configuratie is aanwezig, maar live data laden faalt veilig.
+
+In alle gevallen moet de app blijven starten.
+
+## Google Sheets
+
+Read-only tabs:
 
 - `Portfolio`
 - `Saldi`
@@ -54,26 +68,45 @@ Verplicht read-only:
 
 Optioneel read-only:
 
-- `Transacties`, alleen om `Dividend totaal` te berekenen
+- `Transacties`, alleen voor `Dividend totaal`
 
-## Veiligheid
+De app gebruikt de read-only scope:
 
-Commit nooit echte credentials. `.env`, `credentials/`, `service-account.json`, `*.credentials.json` en `token.json` staan in `.gitignore`.
+```text
+https://www.googleapis.com/auth/spreadsheets.readonly
+```
 
-## Scope fase 3
+Nederlandse getalnotatie wordt centraal geparsed, bijvoorbeeld `0,46499113`, `EUR 22.465,00` en `40,95%`.
 
-Wel:
+## Security
 
-- live data lezen als configuratie geldig is
-- mockdata fallback behouden
-- Nederlandse getalnotatie robuust parsen
-- bestaande Streamlit UI behouden
+Commit nooit secrets:
 
-Niet:
+- `.env`
+- `credentials/`
+- service-account keys
+- token files
 
-- schrijven naar Google Sheets
-- transacties toevoegen
-- saldi updaten
-- Apps Script vervangen
-- Google Finance vervangen
-- live koersrefresh bouwen
+De service-account key blijft lokaal geheim. De app toont geen credentials-inhoud en geen volledige Spreadsheet IDs.
+
+## Debug
+
+Veilige Google Sheets diagnostiek wordt naar de terminal gelogd zonder secrets.
+
+Een tijdelijke debug-expander in de UI kan lokaal worden aangezet met:
+
+```env
+PORTFOLIO_DEBUG_GOOGLE=1
+```
+
+Laat deze waarde uit of zet hem op `0` voor normaal gebruik.
+
+## Geplande fase 4
+
+Fase 4 is nog niet geimplementeerd. De geplande scope:
+
+- append transacties naar het tabblad `Transacties`
+- flow: preview -> bevestigen -> append row
+- geen directe saldi-mutaties
+- geen automatische Apps Script triggers
+- geen delete/update van bestaande rijen

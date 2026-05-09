@@ -9,7 +9,7 @@ from src.formatting import format_currency, format_number, format_percent, signe
 from src.ui import (
     MetricCard,
     PerformanceMetric,
-    render_metric_grid,
+    render_metric_card,
     render_section_header,
     render_target_card,
 )
@@ -81,40 +81,54 @@ def _render_kpis(
     metrics: dict[str, float],
     performance: dict[str, tuple[PerformanceMetric, ...]],
 ) -> None:
-    cards = [
+    total_card = MetricCard(
+        "Totaal vermogen",
+        format_currency(metrics["total_wealth"]),
+        "Cash + actuele beleggingswaarde",
+        variant="primary",
+    )
+    dividend_card = MetricCard(
+        "Dividend totaal",
+        format_currency(metrics["dividend_total"]),
+        "Ontvangen dividend",
+        variant="secondary",
+    )
+    top_left, top_right = st.columns([2, 1], gap="medium")
+    with top_left:
+        render_metric_card(total_card)
+    with top_right:
+        render_metric_card(dividend_card)
+
+    performance_cards = [
         MetricCard(
-            "Totaal vermogen",
-            format_currency(metrics["total_wealth"]),
-            "Cash + actuele beleggingswaarde",
-        ),
-        MetricCard(
-            "Totaal belegd vermogen",
+            "Belegd vermogen",
             format_currency(metrics["invested_value"]),
-            "Winst/verlies op portfolio",
+            "",
             signed_currency(metrics["total_profit"]),
             performance["invested"],
+            "performance",
         ),
         MetricCard(
             "Crypto",
             format_currency(metrics["crypto_value"]),
-            "Winst/verlies crypto",
+            "",
             signed_currency(metrics["crypto_profit"]),
             performance["crypto"],
+            "performance",
         ),
         MetricCard(
             "Aandelen",
             format_currency(metrics["stock_value"]),
-            "Inclusief TSWE",
+            "",
             signed_currency(metrics["stock_profit"]),
             performance["stocks"],
-        ),
-        MetricCard(
-            "Dividend totaal",
-            format_currency(metrics["dividend_total"], decimals=2),
-            "Ontvangen dividend",
+            "performance",
         ),
     ]
-    render_metric_grid(cards)
+    cols = st.columns(3, gap="medium")
+    for col, card in zip(cols, performance_cards):
+        with col:
+            render_metric_card(card)
 
 
 def _calculate_performance_metrics(
@@ -156,7 +170,7 @@ def _build_performance_from_history(
 
     delta = latest_value - reference_value
     percentage = delta / reference_value * 100 if reference_value else 0.0
-    value = f"{signed_currency(delta)} ({format_percent(percentage, 1)})"
+    value = f"{signed_currency(delta)} · {format_percent(percentage, 1)}"
     return PerformanceMetric(label, value)
 
 
@@ -196,25 +210,25 @@ def _render_targets(metrics: dict[str, float], historie: pd.DataFrame) -> None:
 
     targets = [
         (
-            "EUR 100.000 totaal vermogen",
+            "\u20ac100k totaal vermogen",
             format_currency(total_wealth),
             format_currency(APP_CONFIG.target_total_wealth),
             total_wealth / APP_CONFIG.target_total_wealth,
-            "Cash en beleggingen samen.",
+            "",
         ),
         (
-            "EUR 100.000 belegd vermogen",
+            "\u20ac100k belegd vermogen",
             format_currency(invested_value),
             format_currency(APP_CONFIG.target_invested_value),
             invested_value / APP_CONFIG.target_invested_value,
-            "Alleen actuele portfolio waarde.",
+            "",
         ),
         (
             "0.5 BTC",
             f"{format_number(btc_amount, 8)} BTC",
             f"{format_number(APP_CONFIG.target_btc_amount, 1)} BTC",
             btc_amount / APP_CONFIG.target_btc_amount,
-            "Opbouw van de BTC positie.",
+            "",
         ),
     ]
 
