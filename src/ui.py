@@ -8,11 +8,18 @@ import streamlit as st
 
 
 @dataclass(frozen=True)
+class PerformanceMetric:
+    label: str
+    value: str
+
+
+@dataclass(frozen=True)
 class MetricCard:
     label: str
     value: str
     helper: str = ""
     delta: str | None = None
+    performance: tuple[PerformanceMetric, ...] = ()
 
 
 HEADER_IMAGE = Path(__file__).resolve().parents[1] / "assets" / "header-placeholder.svg"
@@ -39,6 +46,11 @@ def render_metric_card(card: MetricCard) -> None:
         st.metric(label=card.label, value=card.value, delta=card.delta)
         if card.helper:
             st.caption(card.helper)
+        if card.performance:
+            performance_line = " | ".join(
+                f"{metric.label}: {metric.value}" for metric in card.performance
+            )
+            st.caption(performance_line)
 
 
 def render_metric_grid(cards: Iterable[MetricCard], columns: int = 3) -> None:

@@ -8,7 +8,7 @@ import streamlit as st
 from src.ui import render_section_header
 
 
-TRANSACTION_TYPES = ["Initial", "Buy", "Sell", "Dividend", "Profit"]
+TRANSACTION_TYPES = ["Buy", "Sell", "Dividend", "Profit", "Initial"]
 CURRENCIES = ["EUR", "USD"]
 
 

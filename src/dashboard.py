@@ -6,7 +6,21 @@ import streamlit as st
 
 from src.config import APP_CONFIG
 from src.formatting import format_currency, format_number, format_percent, signed_currency
-from src.ui import MetricCard, render_metric_grid, render_section_header, render_target_card
+from src.ui import (
+    MetricCard,
+    PerformanceMetric,
+    render_metric_grid,
+    render_section_header,
+    render_target_card,
+)
+
+
+YTD_START_DATE = pd.Timestamp("2026-01-31")
+MOCK_24H_CHANGES = {
+    "invested": 82.35,
+    "crypto": 124.50,
+    "stocks": -42.15,
+}
 
 
 def render_dashboard(
@@ -16,9 +30,10 @@ def render_dashboard(
     dividend_total: float,
 ) -> None:
     metrics = _calculate_metrics(portfolio, saldi, dividend_total)
+    performance = _calculate_performance_metrics(metrics, historie)
 
     render_section_header("Dashboard", "KPI overzicht")
-    _render_kpis(metrics)
+    _render_kpis(metrics, performance)
 
     render_section_header("Targets", "Voortgang")
     _render_targets(metrics)
@@ -70,7 +85,10 @@ def _calculate_metrics(
     }
 
 
-def _render_kpis(metrics: dict[str, float]) -> None:
+def _render_kpis(
+    metrics: dict[str, float],
+    performance: dict[str, tuple[PerformanceMetric, ...]],
+) -> None:
     cards = [
         MetricCard(
             "Totaal vermogen",
@@ -82,18 +100,21 @@ def _render_kpis(metrics: dict[str, float]) -> None:
             format_currency(metrics["invested_value"]),
             "Winst/verlies op portfolio",
             signed_currency(metrics["total_profit"]),
+            performance["invested"],
         ),
         MetricCard(
             "Crypto",
             format_currency(metrics["crypto_value"]),
             "Winst/verlies crypto",
             signed_currency(metrics["crypto_profit"]),
+            performance["crypto"],
         ),
         MetricCard(
             "Aandelen",
             format_currency(metrics["stock_value"]),
             "Aandelen + ETF",
             signed_currency(metrics["stock_profit"]),
+            performance["stocks"],
         ),
         MetricCard(
             "Dividend totaal",
@@ -102,6 +123,68 @@ def _render_kpis(metrics: dict[str, float]) -> None:
         ),
     ]
     render_metric_grid(cards)
+
+
+def _calculate_performance_metrics(
+    metrics: dict[str, float],
+    historie: pd.DataFrame,
+) -> dict[str, tuple[PerformanceMetric, ...]]:
+    definitions = {
+        "invested": ("Belegd Vermogen", metrics["invested_value"]),
+        "crypto": ("Crypto W.", metrics["crypto_value"]),
+        "stocks": ("DeGiro W.", metrics["stock_value"]),
+    }
+
+    return {
+        key: (
+            _build_performance_metric(
+                "24u",
+                MOCK_24H_CHANGES[key],
+                current_value - MOCK_24H_CHANGES[key],
+            ),
+            _build_performance_metric(
+                "30d",
+                current_value - _get_previous_snapshot_value(historie, column),
+                _get_previous_snapshot_value(historie, column),
+            ),
+            _build_performance_metric(
+                "YTD",
+                current_value - _get_ytd_start_value(historie, column),
+                _get_ytd_start_value(historie, column),
+            ),
+        )
+        for key, (column, current_value) in definitions.items()
+    }
+
+
+def _build_performance_metric(
+    label: str,
+    delta: float,
+    reference_value: float,
+) -> PerformanceMetric:
+    percentage = delta / reference_value * 100 if reference_value else 0.0
+    value = f"{signed_currency(delta)} ({format_percent(percentage, 1)})"
+    return PerformanceMetric(label, value)
+
+
+def _get_previous_snapshot_value(historie: pd.DataFrame, column: str) -> float:
+    sorted_history = historie.sort_values("Datum")
+    if len(sorted_history) < 2:
+        return float(sorted_history[column].iloc[-1])
+    return float(sorted_history[column].iloc[-2])
+
+
+def _get_ytd_start_value(historie: pd.DataFrame, column: str) -> float:
+    sorted_history = historie.sort_values("Datum")
+    exact_match = sorted_history.loc[sorted_history["Datum"] == YTD_START_DATE]
+    if not exact_match.empty:
+        return float(exact_match[column].iloc[0])
+
+    earlier_snapshots = sorted_history.loc[sorted_history["Datum"] <= YTD_START_DATE]
+    if not earlier_snapshots.empty:
+        return float(earlier_snapshots[column].iloc[-1])
+
+    return float(sorted_history[column].iloc[0])
 
 
 def _render_targets(metrics: dict[str, float]) -> None:

@@ -11,10 +11,14 @@ def render_portfolio_table(portfolio: pd.DataFrame) -> None:
     portfolio_view = _prepare_portfolio(portfolio)
     category_summary = _build_category_summary(portfolio_view)
 
+    render_section_header("Holdings", "Portfolio tabel")
+    _render_holdings_table(portfolio_view)
+
     render_section_header("Detail", "Portfolio analyse")
     _render_category_visuals(category_summary)
 
-    render_section_header("Holdings", "Portfolio tabel")
+
+def _render_holdings_table(portfolio_view: pd.DataFrame) -> None:
     with st.container(border=True):
         categories = ["Alles", *sorted(portfolio_view["Categorie"].unique())]
         selected_category = st.selectbox("Categorie", categories, index=0)
