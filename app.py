@@ -42,6 +42,7 @@ def main() -> None:
         with st.expander("Debug Google Sheets"):
             st.caption("Veilige diagnostiek. Secrets en volledige Sheet-ID worden niet getoond.")
             st.json(data.google_debug)
+    write_enabled = data.source_label == "Live Google Sheets"
 
     dashboard_tab, portfolio_tab, transaction_tab, saldi_tab = st.tabs(
         ["Dashboard", "Portfolio", "Transactie", "Saldi"]
@@ -54,10 +55,18 @@ def main() -> None:
         render_portfolio_table(data.portfolio, data.historie)
 
     with transaction_tab:
-        render_transaction_form(data.portfolio)
+        render_transaction_form(
+            data.portfolio,
+            write_enabled=write_enabled,
+            on_write_success=get_data.clear,
+        )
 
     with saldi_tab:
-        render_saldi_form(data.saldi)
+        render_saldi_form(
+            data.saldi,
+            write_enabled=write_enabled,
+            on_write_success=get_data.clear,
+        )
 
 
 if __name__ == "__main__":

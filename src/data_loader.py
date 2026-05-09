@@ -11,7 +11,7 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from src.mock_data import MockFinanceData, load_mock_data
-from src.sheets_client import GoogleSheetsReadOnlyClient
+from src.sheets_client import GoogleSheetsClient
 
 
 LOGGER = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ def load_finance_data() -> MockFinanceData:
     _log_google_sheets_diagnostics(diagnostics)
 
     try:
-        client = GoogleSheetsReadOnlyClient.from_environment()
+        client = GoogleSheetsClient.from_environment()
         data = load_google_sheets_data(client)
         return ensure_finance_data_contract(
             data,
@@ -75,7 +75,7 @@ def load_finance_data() -> MockFinanceData:
         )
 
 
-def load_google_sheets_data(client: GoogleSheetsReadOnlyClient) -> MockFinanceData:
+def load_google_sheets_data(client: GoogleSheetsClient) -> MockFinanceData:
     portfolio = parse_portfolio_sheet(client.get_records("Portfolio"))
     saldi = parse_saldi_sheet(client.get_records("Saldi"))
     historie = parse_historie_sheet(client.get_records("Historie"))

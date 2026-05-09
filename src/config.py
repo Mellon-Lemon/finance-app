@@ -4,7 +4,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class AppConfig:
     page_title: str = "Portfolio"
-    phase_label: str = "Fase 3"
+    phase_label: str = "Fase 4"
     base_currency: str = "EUR"
     target_total_wealth: float = 100_000.0
     target_invested_value: float = 100_000.0

@@ -17,22 +17,30 @@ De Streamlit app is de frontend/interface voor:
 
 - dashboardweergave
 - portfolio-analyse
-- transactie-preview
-- saldi-preview
-- read-only data ophalen uit Google Sheets
+- transactie-invoer met gecontroleerde write-back
+- saldi-aanpassing met gecontroleerde write-back
+- live data ophalen uit Google Sheets
+- mockdata fallback
 
 ## Productstatus
 
 Huidige status:
 
 - App title: `Portfolio`
-- Fase 3 afgerond
+- Fase 4 actief
 - Streamlit frontend
-- Live Google Sheets read-only integratie actief
+- Live Google Sheets integratie actief
 - Mockdata fallback actief
-- Geen write-back
+- Write-back alleen voor `Transacties` en `Saldi`
 
-Write-back naar Google Sheets is nog niet gebouwd.
+Niet gebouwd:
+
+- write-back naar `Portfolio`
+- write-back naar `Historie`
+- write-back naar `Instellingen`
+- Apps Script triggers vanuit de app
+- automatische koersdata ophalen
+- deploy
 
 ## Architectuur
 
@@ -44,7 +52,7 @@ Streamlit functioneert als frontend/mobile interface.
 
 De app gebruikt een data-adapterlaag:
 
-- `src/sheets_client.py`: Google Sheets read-only client
+- `src/sheets_client.py`: Google Sheets client voor lezen en beperkte write-back
 - `src/data_loader.py`: live/mock loading, parsing en normalisatie
 - `src/mock_data.py`: lokale fallbackdata
 
@@ -58,13 +66,19 @@ De app ondersteunt drie datamodes:
 - `Mockdata`: geen Google configuratie aanwezig.
 - `Fallback actief`: Google configuratie is aanwezig, maar live laden faalt veilig.
 
-De app moet in alle drie scenario's starten zonder crash.
+Write-back is alleen actief in `Live Google Sheets`.
+
+In `Mockdata` en `Fallback actief`:
+
+- previews blijven werken
+- opslaan is niet beschikbaar
+- er wordt nooit naar Google Sheets geschreven
 
 ## Configuratie
 
 Google Sheets integratie gebruikt service-account authenticatie.
 
-Verplichte environment variables voor live data:
+Verplichte environment variables:
 
 ```env
 GOOGLE_SHEET_ID=...
@@ -78,13 +92,15 @@ GOOGLE_APPLICATION_CREDENTIALS=credentials/service-account.json
 PORTFOLIO_DEBUG_GOOGLE=0
 ```
 
-De Google Sheet moet gedeeld worden met het `client_email` adres uit het service-account JSON-bestand.
+De Google Sheet moet met editorrechten gedeeld worden met het `client_email` adres uit het service-account JSON-bestand.
 
-Read-only scope:
+Scope:
 
 ```text
-https://www.googleapis.com/auth/spreadsheets.readonly
+https://www.googleapis.com/auth/spreadsheets
 ```
+
+Deze scope is nodig voor fase 4 write-back naar `Transacties` en `Saldi`.
 
 Secrets mogen nooit worden gecommit:
 
@@ -130,76 +146,25 @@ Het dashboard bevat:
 - target progress cards
 - equity curve
 
-### KPI's
+KPI's:
 
-Totaal vermogen:
-
-- toont alleen waarde
-- geen winst/verlies badge
-- geen 24u/30d/YTD
-
-Totaal belegd vermogen:
-
-- waarde
-- winst/verlies
-- 24u
-- 30d
-- YTD
-
-Crypto:
-
-- waarde
-- winst/verlies
-- 24u
-- 30d
-- YTD
-
-Aandelen:
-
-- waarde
-- winst/verlies
-- 24u
-- 30d
-- YTD
-
-Dividend totaal:
-
-- toont alleen waarde
-- geen 24u/30d/YTD
-
-### Performance-metrics
+- Totaal vermogen: waarde, geen performance badges
+- Totaal belegd vermogen: waarde, winst/verlies, 24u, 30d, YTD
+- Crypto: waarde, winst/verlies, 24u, 30d, YTD
+- Aandelen: waarde, winst/verlies, 24u, 30d, YTD
+- Dividend totaal: waarde, geen performance badges
 
 Performance wordt berekend uit `Historie`.
 
-Definities:
+YTD-start:
 
-- 24u: laatste beschikbare waarde versus waarde op of voor 1 dag geleden
-- 30d: laatste beschikbare waarde versus waarde op of voor 30 dagen geleden
-- YTD: laatste beschikbare waarde versus waarde op of voor 31-01-2026
+- 31-01-2026
 
-Kolommen:
+Targets:
 
-- Belegd: `Belegd Vermogen`
-- Crypto: `Crypto W.`
-- Aandelen: `DeGiro W.`
-
-Als een referentiedatum ontbreekt, gebruikt de app de dichtstbijzijnde eerdere datum. Als die niet bestaat, toont de app `n.v.t.`.
-
-### Targets
-
-Het dashboard toont drie target cards:
-
-1. EUR 100.000 totaal vermogen
-2. EUR 100.000 belegd vermogen
-3. 0.5 BTC
-
-Elke target card toont:
-
-- huidige waarde
-- doelwaarde
-- percentage voortgang
-- progress bar
-- compacte uitleg
+- EUR 100.000 totaal vermogen
+- EUR 100.000 belegd vermogen
+- 0.5 BTC
 
 ## Portfolio-tab
 
@@ -220,14 +185,6 @@ Holdings tabel:
 - Winst
 - ROI
 
-Detailvisuals:
-
-- waarde per categorie
-- ingelegd vermogen per categorie
-- winst/verlies per categorie
-- belegd vermogen vs ingelegd vermogen
-- equity curve
-
 Categorieen:
 
 - Crypto
@@ -237,9 +194,32 @@ TSWE valt voor nu onder Aandelen.
 
 ## Transactie-tab
 
-De Transactie-tab is preview-only.
+De Transactie-tab heeft in fase 4 gecontroleerde write-back.
 
-Er wordt in fase 3 niets naar Google Sheets geschreven.
+Write-back:
+
+- alleen in `Live Google Sheets`
+- alleen append-only naar tabblad `Transacties`
+- nooit update/delete van bestaande transacties
+- nooit schrijven naar `Portfolio`, `Historie` of `Instellingen`
+
+Flow:
+
+1. Gebruiker vult formulier in.
+2. App toont preview van exact de rij die naar Google Sheets gaat.
+3. Gebruiker bevestigt expliciet.
+4. App appendt pas daarna een rij naar `Transacties`.
+
+Kolomvolgorde `Transacties`:
+
+1. Datum
+2. Ticker
+3. Type
+4. Aantal
+5. Prijs per stuk
+6. Kosten
+7. Totaal
+8. Valuta
 
 Type-volgorde:
 
@@ -251,62 +231,89 @@ Type-volgorde:
 
 Buy is de default.
 
-Velden:
-
-- Datum
-- Ticker
-- Type
-- Aantal
-- Prijs per stuk
-- Totaal
-- Valuta
-
 Datumformaat:
 
 - dd-mm-yyyy
 
-Er is geen apart transactiekostenveld. `Totaal` is inclusief eventuele transactiekosten.
+Kosten:
 
-Voor Buy, Sell en Initial:
+- geen apart UI-veld
+- altijd `0` naar de Sheet
+- `Totaal` is inclusief eventuele transactiekosten
 
-- Totaal is leidend.
-- Als Aantal en Totaal zijn ingevuld, berekent de app Prijs per stuk.
-- Prijs per stuk wordt duidelijk als berekende waarde getoond.
+Buy, Sell en Initial:
 
-Voor Dividend en Profit:
+- Aantal vereist
+- Totaal vereist
+- Prijs per stuk = Totaal / Aantal
 
-- Datum, Ticker, Type, Totaal en Valuta zijn belangrijk.
-- Aantal is optioneel of minder prominent.
+Dividend:
 
-Bevestigen schrijft in fase 3 niets weg.
+- Aantal = 0
+- Prijs per stuk = 0
+- Kosten = 0
+- Totaal moet groter zijn dan 0
+
+Profit:
+
+- Aantal = 0
+- Prijs per stuk = 0
+- Kosten = 0
+- Totaal mag positief of negatief zijn
 
 ## Saldi-tab
 
-De Saldi-tab toont live saldi wanneer Google Sheets beschikbaar is, maar aanpassen blijft preview-only.
+De Saldi-tab heeft in fase 4 gecontroleerde write-back.
 
-De tab bevat:
+Write-back:
 
-- totaal cashsaldo
-- splitsing Spaar / Vakanties / Vrije ruimte
-- formulier om saldo te wijzigen
-- huidige waarde
-- nieuwe waarde
-- verschil
-- bevestiging
+- alleen in `Live Google Sheets`
+- alleen naar tabblad `Saldi`
+- alleen update van bestaande rij
+- alleen kolom `Huidig Saldo`
+- geen nieuwe saldi-rijen
+- geen delete
+- geen accountnaam-wijziging
+- geen Historie-update
 
-Er wordt in fase 3 niets naar Google Sheets geschreven.
+Flow:
+
+1. App toont huidig totaal cashsaldo.
+2. App toont splitsing Spaar / Vakanties / Vrije ruimte.
+3. Gebruiker kiest account.
+4. App toont huidige waarde.
+5. Gebruiker vult nieuwe waarde in.
+6. App toont verschil en preview.
+7. Gebruiker bevestigt expliciet.
+8. App update alleen de juiste `Huidig Saldo` cel.
+
+Validatie:
+
+- account moet bestaan
+- nieuwe waarde moet numeriek zijn
+- waarde mag 0 zijn
+- waarde mag niet negatief zijn
 
 ## Google Sheets datacontract
 
-Fase 3 leest read-only data uit:
+Gelezen tabs:
 
 - `Portfolio`
 - `Saldi`
 - `Historie`
+- `Transacties`, optioneel voor dividend
 
-Optioneel read-only:
+Geschreven tabs:
 
-- `Transacties`, alleen voor `Dividend totaal`
+- `Transacties`
+- `Saldi`
+
+Niet geschreven tabs:
+
+- `Portfolio`
+- `Historie`
+- `Instellingen`
+- alle andere tabs
 
 ### Portfolio
 
@@ -320,20 +327,6 @@ Kolommen:
 - Waarde (EUR)
 - Winst (EUR)
 - ROI %
-
-Gebruik:
-
-- `Categorie` voor categorie
-- `Ticker` voor ticker
-- `Aantal` voor aantal
-- `Inleg` als ingelegd vermogen
-- `Waarde (EUR)` als actuele waarde
-- `Winst (EUR)` als winst/verlies
-- `ROI %` als rendement
-
-Als `Inleg` ontbreekt of niet parsebaar is:
-
-- Ingelegd vermogen = Waarde - Winst
 
 ### Saldi
 
@@ -365,20 +358,9 @@ Kolommen:
 - BTC Aant.
 - Inleg Tot.
 
-Gebruik:
-
-- `Totaal` voor equity curve totaal vermogen
-- `Belegd Vermogen` voor belegd vermogen
-- `Crypto W.` voor crypto waarde
-- `DeGiro W.` voor aandelen waarde
-- `BTC Aant.` voor BTC target
-- `Inleg Tot.` voor totaal ingelegd belegd vermogen
-- `Crypto I.` voor ingelegd crypto
-- `DeGiro I.` voor ingelegd aandelen
-
 ### Transacties
 
-Optioneel read-only voor dividend:
+Kolommen:
 
 - Datum
 - Ticker
@@ -388,12 +370,6 @@ Optioneel read-only voor dividend:
 - Kosten
 - Totaal
 - Valuta
-
-Gebruik:
-
-- filter `Type == Dividend`
-- sommeer `Totaal`
-- als lezen faalt, gebruik veilige fallback
 
 ## Nederlandse parsing
 
@@ -415,39 +391,28 @@ Regels:
 
 - komma is decimaalteken
 - punten worden alleen als duizendtalscheiding verwijderd
-- percentages blijven numerieke percentagewaarden volgens de UI-conventie
 - datums worden day-first geparsed
 - fout geformatteerde cellen mogen de app niet crashen
 
-## Buiten scope fase 3
+## Buiten scope fase 4
 
-Niet bouwen in fase 3:
+Niet bouwen in fase 4:
 
-- schrijven naar Google Sheets
-- transacties toevoegen aan Sheet
-- saldi updaten in Sheet
+- schrijven naar `Portfolio`
+- schrijven naar `Historie`
+- schrijven naar `Instellingen`
+- bestaande transacties updaten
+- bestaande transacties verwijderen
+- saldi-rijen toevoegen of verwijderen
 - Apps Script vervangen
+- Apps Script triggers vanuit Streamlit
 - Google Finance vervangen
 - ROI-engine herbouwen
-- Historie berekenen
 - automatische snapshots maken
 - realtime koersdata buiten de bestaande Sheet ophalen
 - deploy
 - React
 - Next.js
-
-## Geplande fase 4
-
-Fase 4 is write-back voor transacties, nog niet geimplementeerd.
-
-Geplande scope:
-
-- append transacties naar Google Sheets
-- alleen naar tabblad `Transacties`
-- flow: preview -> bevestigen -> append row
-- geen directe saldi-mutaties
-- geen automatische Apps Script triggers
-- geen delete/update van bestaande rijen
 
 ## Projectstructuur
 
@@ -487,4 +452,4 @@ finance-app/
 - rustige spacing
 - duidelijke card hierarchy
 
-Dashboard blijft cockpit. Portfolio bevat details en analyse. Transactie en Saldi blijven preview-only tot de write-back fase.
+Dashboard blijft cockpit. Portfolio bevat details en analyse. Transactie en Saldi gebruiken preview + bevestiging voordat write-back plaatsvindt.

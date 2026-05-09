@@ -4,22 +4,25 @@ Mobile-friendly Streamlit portfolio dashboard bovenop een bestaande Google Sheet
 
 ## Projectstatus
 
-Fase 3 is afgerond:
+Fase 4 is actief:
 
-- Google Sheets read-only integratie werkt.
+- Google Sheets live data werkt.
 - Mockdata fallback blijft beschikbaar.
-- De app toont de actieve datamode: `Live Google Sheets`, `Mockdata` of `Fallback actief`.
-- Write-back is nog niet actief.
+- Write-back is beschikbaar voor `Transacties` en `Saldi`.
+- Write-back werkt alleen in `Live Google Sheets` mode.
 
-Nog niet gebouwd:
+Niet gebouwd:
 
-- transacties opslaan naar Google Sheets
-- saldi updaten in Google Sheets
-- bestaande Sheet-rijen wijzigen of verwijderen
+- schrijven naar `Portfolio`
+- schrijven naar `Historie`
+- schrijven naar `Instellingen`
+- bestaande transacties wijzigen of verwijderen
+- Apps Script vervangen
+- Google Finance vervangen
 
 ## Setup
 
-Installeer Python en maak daarna lokaal een virtual environment:
+Installeer Python en maak lokaal een virtual environment:
 
 ```powershell
 python -m venv .venv
@@ -40,7 +43,7 @@ Plaats het service-account JSON-bestand lokaal, bijvoorbeeld:
 credentials/service-account.json
 ```
 
-De Google Sheet moet gedeeld worden met het `client_email` adres uit dit service-account bestand.
+De Google Sheet moet met editorrechten gedeeld worden met het `client_email` adres uit dit service-account bestand. Er zijn geen extra Google Cloud rollen nodig buiten toegang tot de Sheet.
 
 ## Starten
 
@@ -56,27 +59,60 @@ De app kiest automatisch de best beschikbare databron:
 - `Mockdata`: er is geen Google configuratie aanwezig.
 - `Fallback actief`: Google configuratie is aanwezig, maar live data laden faalt veilig.
 
-In alle gevallen moet de app blijven starten.
+Write-back is alleen actief bij `Live Google Sheets`.
+
+In `Mockdata` en `Fallback actief` blijven previews werken, maar schrijft de app nooit naar Google Sheets.
 
 ## Google Sheets
 
-Read-only tabs:
+Gelezen tabs:
 
 - `Portfolio`
 - `Saldi`
 - `Historie`
+- `Transacties`, optioneel voor `Dividend totaal`
 
-Optioneel read-only:
+Geschreven tabs:
 
-- `Transacties`, alleen voor `Dividend totaal`
+- `Transacties`: append-only nieuwe transactierijen
+- `Saldi`: update-only bestaande `Huidig Saldo` cel van een bestaand account
 
-De app gebruikt de read-only scope:
+De app gebruikt de scope:
 
 ```text
-https://www.googleapis.com/auth/spreadsheets.readonly
+https://www.googleapis.com/auth/spreadsheets
 ```
 
 Nederlandse getalnotatie wordt centraal geparsed, bijvoorbeeld `0,46499113`, `EUR 22.465,00` en `40,95%`.
+
+## Transacties
+
+Nieuwe transacties worden pas geschreven na:
+
+1. invoer
+2. preview van de exacte Sheet-rij
+3. expliciete bevestiging
+4. klik op `Transactie opslaan`
+
+De app schrijft naar `Transacties` met kolommen:
+
+```text
+Datum, Ticker, Type, Aantal, Prijs per stuk, Kosten, Totaal, Valuta
+```
+
+`Kosten` wordt altijd als `0` geschreven. `Totaal` is inclusief eventuele transactiekosten.
+
+## Saldi
+
+Saldo-updates worden pas geschreven na:
+
+1. account kiezen
+2. nieuwe waarde invoeren
+3. preview controleren
+4. expliciete bevestiging
+5. klik op `Saldo opslaan`
+
+De app update alleen de bestaande `Huidig Saldo` cel in het tabblad `Saldi`.
 
 ## Security
 
@@ -100,13 +136,3 @@ PORTFOLIO_DEBUG_GOOGLE=1
 ```
 
 Laat deze waarde uit of zet hem op `0` voor normaal gebruik.
-
-## Geplande fase 4
-
-Fase 4 is nog niet geimplementeerd. De geplande scope:
-
-- append transacties naar het tabblad `Transacties`
-- flow: preview -> bevestigen -> append row
-- geen directe saldi-mutaties
-- geen automatische Apps Script triggers
-- geen delete/update van bestaande rijen
