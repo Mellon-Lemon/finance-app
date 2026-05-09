@@ -1,8 +1,8 @@
 import streamlit as st
 
 from src.config import APP_CONFIG
+from src.data_loader import load_finance_data
 from src.dashboard import render_dashboard
-from src.mock_data import load_mock_data
 from src.portfolio import render_portfolio_table
 from src.saldi import render_saldi_form
 from src.styles import inject_global_styles
@@ -19,14 +19,21 @@ st.set_page_config(
 
 @st.cache_data
 def get_data():
-    return load_mock_data()
+    return load_finance_data()
 
 
 def main() -> None:
     inject_global_styles()
 
     data = get_data()
-    render_app_header(APP_CONFIG.page_title, APP_CONFIG.phase_label)
+    render_app_header(
+        APP_CONFIG.page_title,
+        APP_CONFIG.phase_label,
+        data.source_label,
+        data.source_message,
+    )
+    if data.source_warning:
+        st.warning(data.source_warning)
 
     dashboard_tab, portfolio_tab, transaction_tab, saldi_tab = st.tabs(
         ["Dashboard", "Portfolio", "Transactie", "Saldi"]

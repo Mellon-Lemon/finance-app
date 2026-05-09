@@ -1,13 +1,8 @@
 # Portfolio
 
-Fase 2 van de Streamlit finance app: een mobile-friendly dashboard met alleen mockdata.
+Mobile-friendly Streamlit portfolio dashboard.
 
-## Scope fase 2
-
-- Geen Google Sheets API
-- Geen echte data
-- Geen write-back functionaliteit
-- Wel dashboard cards, portfolio tabel, historische grafiek en mock formulieren
+Fase 3 leest Google Sheets data read-only wanneer credentials beschikbaar zijn. Zonder geldige configuratie start de app automatisch met mockdata fallback.
 
 ## Starten
 
@@ -15,31 +10,70 @@ Fase 2 van de Streamlit finance app: een mobile-friendly dashboard met alleen mo
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-streamlit run app.py
+python -m streamlit run app.py
 ```
 
-## Structuur
+## Mockdata fallback
+
+De app gebruikt mockdata wanneer:
+
+- `.env` ontbreekt
+- `GOOGLE_SHEET_ID` ontbreekt
+- service-account credentials ontbreken
+- Google Sheets tijdelijk niet bereikbaar is
+- de verplichte tabs geen bruikbare data teruggeven
+
+De header toont de actieve databron: `Mockdata`, `Live Google Sheets` of `Fallback actief`.
+
+## Google Sheets read-only
+
+Maak lokaal een `.env` bestand op basis van `.env.example`:
+
+```env
+GOOGLE_SHEET_ID=your-google-sheet-id
+GOOGLE_SERVICE_ACCOUNT_FILE=credentials/service-account.json
+```
+
+Plaats het service-account JSON-bestand lokaal, bijvoorbeeld:
 
 ```text
-finance-app/
-|-- app.py
-|-- README.md
-|-- requirements.txt
-|-- .gitignore
-|-- docs/
-|   `-- spec.md
-`-- src/
-    |-- __init__.py
-    |-- config.py
-    |-- dashboard.py
-    |-- formatting.py
-    |-- mock_data.py
-    |-- portfolio.py
-    |-- saldi.py
-    |-- styles.py
-    `-- transactions.py
+credentials/service-account.json
 ```
 
-## Volgende fases
+De Google Sheet moet gedeeld worden met het `client_email` adres uit het service-account JSON-bestand.
 
-Fase 3 kan de mockdata vervangen door read-only Google Sheets integratie. Schrijven naar transacties en saldi blijft pas voor latere fases.
+Fase 3 gebruikt alleen read-only toegang. De app schrijft nog niets naar Google Sheets.
+
+## Gelezen tabs
+
+Verplicht read-only:
+
+- `Portfolio`
+- `Saldi`
+- `Historie`
+
+Optioneel read-only:
+
+- `Transacties`, alleen om `Dividend totaal` te berekenen
+
+## Veiligheid
+
+Commit nooit echte credentials. `.env`, `credentials/`, `service-account.json`, `*.credentials.json` en `token.json` staan in `.gitignore`.
+
+## Scope fase 3
+
+Wel:
+
+- live data lezen als configuratie geldig is
+- mockdata fallback behouden
+- Nederlandse getalnotatie robuust parsen
+- bestaande Streamlit UI behouden
+
+Niet:
+
+- schrijven naar Google Sheets
+- transacties toevoegen
+- saldi updaten
+- Apps Script vervangen
+- Google Finance vervangen
+- live koersrefresh bouwen

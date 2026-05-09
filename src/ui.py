@@ -25,15 +25,20 @@ class MetricCard:
 HEADER_IMAGE = Path(__file__).resolve().parents[1] / "assets" / "header-placeholder.svg"
 
 
-def render_app_header(title: str, phase_label: str) -> None:
+def render_app_header(
+    title: str,
+    phase_label: str,
+    source_label: str = "Mockdata",
+    source_message: str = "Lokale fallback",
+) -> None:
     with st.container(border=True):
         st.image(str(HEADER_IMAGE), width="stretch")
         title_col, status_col = st.columns([1, 0.36], gap="medium")
         with title_col:
             st.title(title, anchor=False)
         with status_col:
-            st.caption("Mockdata")
-            st.caption("Laatste update: 09-05-2026")
+            st.caption(source_label)
+            st.caption(source_message)
 
 
 def render_section_header(kicker: str, title: str) -> None:

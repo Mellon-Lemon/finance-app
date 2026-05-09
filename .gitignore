@@ -9,9 +9,14 @@ env/
 
 .env
 .env.*
+!.env.example
+credentials/
 credentials.json
 service-account*.json
+service-account.json
+*.credentials.json
 *.secret.json
+token.json
 
 .streamlit/secrets.toml
 

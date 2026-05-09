@@ -11,6 +11,9 @@ class MockFinanceData:
     saldi: pd.DataFrame
     historie: pd.DataFrame
     dividend_total: float
+    source_label: str = "Mockdata"
+    source_message: str = "Lokale fallback"
+    source_warning: str = ""
 
 
 def load_mock_data() -> MockFinanceData:

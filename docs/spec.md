@@ -504,3 +504,10 @@ Belangrijk:
 - Portfolio bevat details en visualisaties.
 - Transactie is snel en eenduidig voor mobiele invoer.
 - Saldi voelt veilig en duidelijk door preview en bevestiging.
+#### Future phase: manual live price refresh
+- Eerst Google Sheets lezen.
+- Dan transacties/saldi schrijven.
+- Daarna live koers-refresh als aparte module.
+- Niet automatisch pollen.
+- Alleen op gebruikersactie.
+- Geen standaard write-back zonder bevestiging.
