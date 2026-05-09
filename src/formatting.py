@@ -2,7 +2,10 @@ from __future__ import annotations
 
 
 def format_currency(value: float, currency: str = "EUR", decimals: int = 0) -> str:
-    return f"{currency} {value:,.{decimals}f}"
+    formatted = f"{value:,.{decimals}f}"
+    formatted = formatted.replace(",", "_").replace(".", ",").replace("_", ".")
+    prefix = "€" if currency == "EUR" else currency
+    return f"{prefix} {formatted}"
 
 
 def format_number(value: float, decimals: int = 2) -> str:

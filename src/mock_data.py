@@ -10,6 +10,7 @@ class MockFinanceData:
     portfolio: pd.DataFrame
     saldi: pd.DataFrame
     historie: pd.DataFrame
+    dividend_total: float
 
 
 def load_mock_data() -> MockFinanceData:
@@ -17,6 +18,7 @@ def load_mock_data() -> MockFinanceData:
         portfolio=_build_portfolio(),
         saldi=_build_saldi(),
         historie=_build_historie(),
+        dividend_total=166.51,
     )
 
 

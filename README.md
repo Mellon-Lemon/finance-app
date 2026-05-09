@@ -1,4 +1,4 @@
-# Finance Companion
+# Portfolio
 
 Fase 2 van de Streamlit finance app: een mobile-friendly dashboard met alleen mockdata.
 

@@ -1,1 +1,1 @@
-"""Finance Companion Streamlit app modules."""
+"""Portfolio Streamlit app modules."""

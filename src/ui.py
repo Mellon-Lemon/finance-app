@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable
 
 import streamlit as st
@@ -14,10 +15,18 @@ class MetricCard:
     delta: str | None = None
 
 
+HEADER_IMAGE = Path(__file__).resolve().parents[1] / "assets" / "header-placeholder.svg"
+
+
 def render_app_header(title: str, phase_label: str) -> None:
-    st.caption(f"{phase_label} / Mockdata")
-    st.title(title)
-    st.divider()
+    with st.container(border=True):
+        text_col, image_col = st.columns([1.15, 1], gap="large")
+        with text_col:
+            st.caption(f"{phase_label} / Mockdata")
+            st.title(title)
+            st.write("Mobiel dashboard voor vermogen, holdings en snelle invoer.")
+        with image_col:
+            st.image(str(HEADER_IMAGE), width="stretch")
 
 
 def render_section_header(kicker: str, title: str) -> None:
@@ -40,3 +49,18 @@ def render_metric_grid(cards: Iterable[MetricCard], columns: int = 3) -> None:
         for col, card in zip(cols, row):
             with col:
                 render_metric_card(card)
+
+
+def render_target_card(
+    title: str,
+    current_value: str,
+    target_value: str,
+    progress: float,
+    helper: str,
+) -> None:
+    bounded_progress = max(0.0, min(progress, 1.0))
+    with st.container(border=True):
+        st.metric(title, current_value)
+        st.caption(f"Doel: {target_value}")
+        st.progress(bounded_progress, text=f"{progress:.0%}")
+        st.caption(helper)

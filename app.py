@@ -33,7 +33,7 @@ def main() -> None:
     )
 
     with dashboard_tab:
-        render_dashboard(data.portfolio, data.saldi, data.historie)
+        render_dashboard(data.portfolio, data.saldi, data.historie, data.dividend_total)
 
     with portfolio_tab:
         render_portfolio_table(data.portfolio)

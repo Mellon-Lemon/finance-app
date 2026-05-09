@@ -155,6 +155,12 @@ def inject_global_styles() -> None:
                 border-radius: 8px;
                 overflow: hidden;
             }
+
+            [data-testid="stImage"] img {
+                border-radius: 8px;
+                max-height: 220px;
+                object-fit: cover;
+            }
         </style>
         """,
         unsafe_allow_html=True,

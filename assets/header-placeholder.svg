@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" role="img" aria-label="Portfolio header placeholder">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="0.45" stop-color="#1e3a8a"/>
+      <stop offset="1" stop-color="#047857"/>
+    </linearGradient>
+    <linearGradient id="line" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#22c55e"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="360" fill="url(#bg)"/>
+  <circle cx="1060" cy="72" r="160" fill="#ffffff" opacity="0.08"/>
+  <circle cx="150" cy="320" r="210" fill="#ffffff" opacity="0.06"/>
+  <path d="M110 250 C250 215 310 235 430 180 C560 120 665 145 775 105 C890 62 980 92 1090 52" fill="none" stroke="url(#line)" stroke-width="14" stroke-linecap="round"/>
+  <path d="M110 250 C250 215 310 235 430 180 C560 120 665 145 775 105 C890 62 980 92 1090 52" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="34" stroke-linecap="round"/>
+  <g fill="#ffffff" opacity="0.72">
+    <rect x="110" y="82" width="260" height="18" rx="9"/>
+    <rect x="110" y="118" width="430" height="44" rx="12"/>
+    <rect x="110" y="184" width="320" height="16" rx="8"/>
+  </g>
+</svg>

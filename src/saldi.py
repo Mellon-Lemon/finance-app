@@ -4,61 +4,51 @@ import pandas as pd
 import streamlit as st
 
 from src.formatting import format_currency, signed_currency
-from src.ui import MetricCard, render_metric_card, render_section_header
+from src.ui import MetricCard, render_metric_card, render_metric_grid, render_section_header
 
 
 def render_saldi_form(saldi: pd.DataFrame) -> None:
-    render_section_header("Cash", "Saldi aanpassen")
+    render_section_header("Cash", "Saldo overzicht")
+    _render_cash_overview(saldi)
 
-    account = st.selectbox("Account", saldi["Account"].tolist())
-    current_balance = float(
-        saldi.loc[saldi["Account"] == account, "Huidig Saldo"].iloc[0]
-    )
+    render_section_header("Aanpassen", "Saldo wijzigen")
+    _render_adjustment_form(saldi)
 
-    render_metric_card(MetricCard("Huidig saldo", format_currency(current_balance)))
 
-    with st.form("saldi_form", clear_on_submit=False):
+def _render_cash_overview(saldi: pd.DataFrame) -> None:
+    total_cash = float(saldi["Huidig Saldo"].sum())
+    render_metric_card(MetricCard("Totaal cashsaldo", format_currency(total_cash)))
+
+    cards = [
+        MetricCard(row["Account"], format_currency(float(row["Huidig Saldo"])))
+        for _, row in saldi.iterrows()
+    ]
+    render_metric_grid(cards)
+
+
+def _render_adjustment_form(saldi: pd.DataFrame) -> None:
+    with st.container(border=True):
+        account = st.selectbox("Account", saldi["Account"].tolist())
+        current_balance = float(
+            saldi.loc[saldi["Account"] == account, "Huidig Saldo"].iloc[0]
+        )
         new_balance = st.number_input(
-            "Nieuw saldo",
+            "Nieuwe waarde",
             min_value=0.0,
             value=current_balance,
             step=50.0,
             format="%.2f",
         )
-        confirmed = st.checkbox("Ik bevestig deze mock-preview")
-        submitted = st.form_submit_button("Toon saldo-preview", use_container_width=True)
+        difference = new_balance - current_balance
 
-    if not submitted:
-        return
+        current_col, new_col, diff_col = st.columns(3, gap="medium")
+        with current_col:
+            st.metric("Huidige waarde", format_currency(current_balance))
+        with new_col:
+            st.metric("Nieuwe waarde", format_currency(new_balance))
+        with diff_col:
+            st.metric("Verschil", signed_currency(difference))
 
-    difference = new_balance - current_balance
-    preview = pd.DataFrame(
-        [
-            {
-                "Account": account,
-                "Huidig Saldo": current_balance,
-                "Nieuw Saldo": new_balance,
-                "Verschil": difference,
-            }
-        ]
-    )
-
-    render_metric_card(MetricCard("Verschil", signed_currency(difference)))
-    st.dataframe(
-        preview,
-        hide_index=True,
-        use_container_width=True,
-        column_config={
-            "Huidig Saldo": st.column_config.NumberColumn(
-                "Huidig Saldo", format="EUR %.2f"
-            ),
-            "Nieuw Saldo": st.column_config.NumberColumn(
-                "Nieuw Saldo", format="EUR %.2f"
-            ),
-            "Verschil": st.column_config.NumberColumn("Verschil", format="EUR %.2f"),
-        },
-    )
-    if confirmed:
-        st.success("Saldo-preview bevestigd. Er is niets opgeslagen in fase 2.")
-    else:
-        st.warning("Preview getoond. Vink bevestiging aan voordat write-back in latere fases wordt gebruikt.")
+        confirmed = st.checkbox("Ik bevestig deze wijziging")
+        if st.button("Bevestig mock-wijziging", disabled=not confirmed):
+            st.success("Saldo-preview bevestigd. Er is niets opgeslagen in fase 2.")
