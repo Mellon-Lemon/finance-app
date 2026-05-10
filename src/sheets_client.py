@@ -66,10 +66,61 @@ class GoogleSheetsClient:
         except Exception:
             return []
 
+    def get_transaction_rows(self) -> list[dict[str, object]]:
+        worksheet = self._get_spreadsheet().worksheet("Transacties")
+        values = worksheet.get_all_values()
+        if not values:
+            return []
+
+        headers = values[0]
+        rows: list[dict[str, object]] = []
+        for sheet_row, row_values in enumerate(values[1:], start=2):
+            record = {
+                column: _get_by_header(headers, row_values, column)
+                for column in TRANSACTION_COLUMNS
+            }
+            if not any(str(value).strip() for value in record.values()):
+                continue
+            record["Sheet rij"] = sheet_row
+            rows.append(record)
+        return rows
+
+    def try_get_transaction_rows(self) -> list[dict[str, object]]:
+        try:
+            return self.get_transaction_rows()
+        except Exception:
+            return []
+
     def append_transaction(self, row: dict[str, object]) -> None:
         values = [row.get(column, "") for column in TRANSACTION_COLUMNS]
         worksheet = self._get_spreadsheet().worksheet("Transacties")
         worksheet.append_row(values, value_input_option="USER_ENTERED")
+
+    def delete_transaction_row(
+        self,
+        sheet_row: int,
+        expected_row: dict[str, object],
+    ) -> None:
+        if sheet_row < 2:
+            raise ValueError("Ongeldig rijnummer voor Transacties.")
+
+        worksheet = self._get_spreadsheet().worksheet("Transacties")
+        values = worksheet.get_all_values()
+        if len(values) < sheet_row:
+            raise ValueError("Transactie bestaat niet meer in Google Sheets.")
+
+        headers = values[0]
+        current_values = values[sheet_row - 1]
+        current_row = {
+            column: _get_by_header(headers, current_values, column)
+            for column in TRANSACTION_COLUMNS
+        }
+        for column in TRANSACTION_COLUMNS:
+            expected_value = expected_row.get(column, "")
+            if _normalise_cell(current_row.get(column, "")) != _normalise_cell(expected_value):
+                raise ValueError("Transactie is gewijzigd sinds de preview. Laad data opnieuw.")
+
+        worksheet.delete_rows(sheet_row)
 
     def update_saldo(self, account: str, new_value: float) -> None:
         worksheet = self._get_spreadsheet().worksheet("Saldi")
@@ -126,5 +177,16 @@ def _find_column(headers: list[str], expected: str) -> int | None:
     return None
 
 
+def _get_by_header(headers: list[str], row: list[str], expected: str) -> object:
+    column = _find_column(headers, expected)
+    if column is None or len(row) < column:
+        return ""
+    return row[column - 1]
+
+
 def _normalise_header(value: str) -> str:
     return str(value).strip().lower().replace(".", "")
+
+
+def _normalise_cell(value: object) -> str:
+    return str(value).strip()

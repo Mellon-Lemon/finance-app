@@ -11,6 +11,7 @@ class MockFinanceData:
     saldi: pd.DataFrame
     historie: pd.DataFrame
     dividend_total: float
+    transactions: pd.DataFrame = field(default_factory=pd.DataFrame)
     source_label: str = "Mockdata"
     source_message: str = "Lokale fallback"
     source_warning: str = ""
@@ -23,6 +24,7 @@ def load_mock_data() -> MockFinanceData:
         saldi=_build_saldi(),
         historie=_build_historie(),
         dividend_total=166.51,
+        transactions=_build_transactions(),
     )
 
 
@@ -144,3 +146,17 @@ def _build_historie() -> pd.DataFrame:
             "Inleg Tot.",
         ]
     ]
+
+
+def _build_transactions() -> pd.DataFrame:
+    rows = [
+        {"Sheet rij": 11, "Datum": "08-05-2026", "Ticker": "BTC", "Type": "Buy", "Aantal": 0.02, "Totaal": 1250.0, "Valuta": "EUR"},
+        {"Sheet rij": 12, "Datum": "08-05-2026", "Ticker": "GOOGL", "Type": "Buy", "Aantal": 2.0, "Totaal": 345.0, "Valuta": "EUR"},
+        {"Sheet rij": 13, "Datum": "09-05-2026", "Ticker": "MSFT", "Type": "Dividend", "Aantal": 0.0, "Totaal": 22.5, "Valuta": "EUR"},
+        {"Sheet rij": 14, "Datum": "09-05-2026", "Ticker": "AMZN", "Type": "Buy", "Aantal": 1.0, "Totaal": 184.2, "Valuta": "EUR"},
+        {"Sheet rij": 15, "Datum": "10-05-2026", "Ticker": "BTC", "Type": "Buy", "Aantal": 0.01, "Totaal": 680.0, "Valuta": "EUR"},
+    ]
+    return pd.DataFrame(
+        rows,
+        columns=["Sheet rij", "Datum", "Ticker", "Type", "Aantal", "Totaal", "Valuta"],
+    )

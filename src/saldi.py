@@ -82,8 +82,13 @@ def _render_adjustment_form(
         if already_saved:
             st.success("Deze saldo-wijziging is opgeslagen.")
 
-        confirmed = st.checkbox("Ik bevestig deze saldo-wijziging")
-        disabled = not confirmed or not write_enabled or already_saved
+        confirmed = st.checkbox("Ik bevestig deze saldo-wijziging", key="saldo_confirmed")
+        disabled = (
+            not confirmed
+            or not write_enabled
+            or already_saved
+            or st.session_state.get("saldo_save_in_progress", False)
+        )
         if st.button("Saldo opslaan", disabled=disabled):
             _save_saldo(account, float(new_balance), preview_key, on_write_success)
 
@@ -123,13 +128,16 @@ def _save_saldo(
     on_write_success,
 ) -> None:
     try:
+        st.session_state["saldo_save_in_progress"] = True
         GoogleSheetsClient.from_environment().update_saldo(account, new_value)
     except Exception as exc:
         LOGGER.warning("Saldo opslaan faalt veilig: %s", exc)
         st.error("Saldo kon niet worden opgeslagen. Controleer schrijfrechten en tabblad Saldi.")
+        st.session_state["saldo_save_in_progress"] = False
         return
 
     st.session_state["saldo_last_saved"] = preview_key
+    st.session_state["saldo_save_in_progress"] = False
     if on_write_success:
         on_write_success()
     st.success("Saldo opgeslagen in Google Sheets.")

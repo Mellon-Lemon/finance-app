@@ -4,21 +4,27 @@ Mobile-friendly Streamlit portfolio dashboard bovenop een bestaande Google Sheet
 
 ## Projectstatus
 
-Fase 4.5A is actief:
+Fase 5B is actief:
 
 - Google Sheets live data werkt.
 - Mockdata fallback blijft beschikbaar.
 - Write-back is beschikbaar voor `Transacties` en `Saldi`.
 - Write-back werkt alleen in `Live Google Sheets` mode.
-- Handmatig data verversen leest Google Sheets opnieuw in.
+- Handmatig data opnieuw laden leest Google Sheets opnieuw in.
 - Optioneel kan Streamlit `refreshPortfolioOnly()` aanroepen via een Apps Script Web App endpoint.
+- Transacties kunnen achter elkaar worden toegevoegd.
+- Recente transacties zijn zichtbaar in de Transactie-tab.
+- De laatste 3 transacties per ticker kunnen veilig individueel worden verwijderd in Live mode.
+- Navigatie blijft op de actieve sectie na interacties.
+- Portfolio heeft een compacte, mobielvriendelijke holdingsweergave.
+- Demo / Mockdata mode is handmatig beschikbaar om de app veilig te tonen zonder privédata.
 
 Niet gebouwd:
 
 - schrijven naar `Portfolio`
 - schrijven naar `Historie`
 - schrijven naar `Instellingen`
-- bestaande transacties wijzigen of verwijderen
+- bestaande transacties wijzigen
 - Apps Script vervangen
 - Google Finance vervangen
 
@@ -62,19 +68,21 @@ python -m streamlit run app.py
 
 ## Datamodes
 
-De app kiest automatisch de best beschikbare databron:
+De app heeft een handmatige `Datamodus` in de sidebar:
 
-- `Live Google Sheets`: `.env`, credentials en Sheet zijn geldig.
-- `Mockdata`: er is geen Google configuratie aanwezig.
+- `Live Google Sheets`: gebruikt echte Google Sheets data wanneer `.env`, credentials en Sheet geldig zijn.
+- `Demo / Mockdata`: gebruikt altijd lokale mockdata en probeert geen Google Sheets of Apps Script aan te roepen.
 - `Fallback actief`: Google configuratie is aanwezig, maar live data laden faalt veilig.
 
-Write-back is alleen actief bij `Live Google Sheets`.
+Write-back, delete en `Portfolio bijwerken` zijn alleen actief bij echte `Live Google Sheets` data.
 
-In `Mockdata` en `Fallback actief` blijven previews werken, maar schrijft de app nooit naar Google Sheets.
+In `Demo / Mockdata` en `Fallback actief` blijven previews werken, maar schrijft of verwijdert de app nooit iets in Google Sheets. Demo mode is bedoeld voor demonstraties en screenshots zonder echte financiële data.
 
-## Verversen En Bijwerken
+## Opnieuw Laden En Bijwerken
 
-Gebruik `Data verversen` om de Streamlit cache te legen en de gegevens opnieuw uit Google Sheets te lezen.
+App-open is read-only: bij het openen leest Streamlit alleen data. De app triggert niet automatisch Apps Script en werkt Portfolio niet vanzelf bij.
+
+Gebruik `Data opnieuw laden` om de Streamlit cache te legen en de gegevens opnieuw uit Google Sheets te lezen.
 
 Deze knop:
 
@@ -83,7 +91,7 @@ Deze knop:
 - triggert geen Apps Script
 - verstuurt geen e-mail
 - haalt geen live koersdata buiten de bestaande Sheet op
-- werkt veilig in `Mockdata` en `Fallback actief`
+- werkt veilig in `Demo / Mockdata` en `Fallback actief`
 
 Gebruik `Portfolio bijwerken` om het Apps Script Web App endpoint aan te roepen. Deze actie:
 
@@ -94,10 +102,11 @@ Gebruik `Portfolio bijwerken` om het Apps Script Web App endpoint aan te roepen.
 - verstuurt geen e-mail
 - leest daarna de Google Sheets data opnieuw
 - werkt alleen in `Live Google Sheets` mode met `APPS_SCRIPT_REFRESH_URL` en `APPS_SCRIPT_REFRESH_SECRET`
+- is uitgeschakeld in `Demo / Mockdata`
 
-Als de Apps Script endpoint-configuratie ontbreekt, blijft de app werken en blijft `Data verversen` beschikbaar. Na een succesvolle transactie- of saldi-write probeert de app `Portfolio bijwerken` automatisch uit te voeren als dit geconfigureerd is.
+Als de Apps Script endpoint-configuratie ontbreekt, blijft de app werken en blijft `Data opnieuw laden` beschikbaar. Na een succesvolle transactie- of saldi-write probeert de app `Portfolio bijwerken` automatisch uit te voeren als dit geconfigureerd is.
 
-De dagelijkse snapshot blijft buiten Streamlit: Apps Script voert `dailyPortfolioSnapshot()` apart uit via de 22:00 trigger.
+De dagelijkse snapshot blijft buiten Streamlit: Apps Script voert `dailyPortfolioSnapshot()` apart uit via de 22:00 trigger. Historie-snapshots en eventuele e-mailnotificaties blijven daar.
 
 ## Google Sheets
 
@@ -112,6 +121,10 @@ Geschreven tabs:
 
 - `Transacties`: append-only nieuwe transactierijen
 - `Saldi`: update-only bestaande `Huidig Saldo` cel van een bestaand account
+
+Veilige correctie:
+
+- `Transacties`: delete van maximaal een bestaande rij tegelijk, alleen na preview en expliciete bevestiging
 
 De app gebruikt de scope:
 
@@ -137,6 +150,33 @@ Datum, Ticker, Type, Aantal, Prijs per stuk, Kosten, Totaal, Valuta
 ```
 
 `Kosten` wordt altijd als `0` geschreven. `Totaal` is inclusief eventuele transactiekosten.
+
+Na een succesvolle transactie reset de app logische invoervelden zoals `Aantal` en `Totaal`, zodat meerdere transacties achter elkaar kunnen worden toegevoegd zonder dubbele submit van dezelfde preview. Datum, type en valuta vallen terug op handige defaults.
+
+De Transactie-tab toont ook `Recente transacties` met de laatste 10 transacties. In `Demo / Mockdata` of `Fallback actief` wordt nooit geschreven of verwijderd.
+
+Veilige correcties zijn beschikbaar in `Live Google Sheets` mode:
+
+- klik eerst op `Transactie verwijderen`
+- kies een ticker
+- bekijk maximaal de laatste 3 transacties voor die ticker
+- selecteer exact een rij
+- bevestig expliciet dat de rij uit Google Sheets wordt verwijderd
+- verwijder maximaal een transactie tegelijk
+
+Delete raakt alleen het tabblad `Transacties`. Daarna probeert de app `Portfolio bijwerken` en laadt data opnieuw. Er wordt geen `Historie` snapshot gemaakt en er wordt geen e-mail verstuurd.
+
+De delete-flow gebruikt expliciete widget keys, zodat het verwijderpaneel zonder `StreamlitDuplicateElementId` opent.
+
+## Portfolio
+
+De Portfolio-weergave gebruikt standaard compacte, scanbare holdings. De tabelweergave blijft beschikbaar door `Compacte weergave` uit te zetten.
+
+- `Categorie` staat niet meer in de holdings-tabel
+- `Ingelegd vermogen` heet `Inleg`
+- bedragen tonen `€`
+- aantallen, winst/verlies en ROI worden compact geformatteerd
+- de compacte weergave voorkomt brede mobiele tabellen
 
 ## Saldi
 

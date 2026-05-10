@@ -18,16 +18,22 @@ from src.transactions import render_transaction_form
 from src.ui import render_app_header
 
 
+APP_TABS = ["Dashboard", "Portfolio", "Transactie", "Saldi"]
+DATA_MODE_LABELS = {
+    "live": "Live Google Sheets",
+    "demo": "Demo / Mockdata",
+}
+
 st.set_page_config(
     page_title=APP_CONFIG.page_title,
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 
 @st.cache_data
-def get_data():
-    return ensure_finance_data_contract(load_finance_data())
+def get_data(force_mock: bool = False):
+    return ensure_finance_data_contract(load_finance_data(force_mock=force_mock))
 
 
 def queue_status_message(level: str, message: str) -> None:
@@ -57,23 +63,52 @@ def render_status_message() -> None:
         st.info(message)
 
 
-def render_refresh_control(source_label: str) -> None:
+def render_data_mode_control() -> str:
+    st.session_state.setdefault("data_mode", "live")
+    with st.sidebar:
+        st.radio(
+            "Datamodus",
+            options=list(DATA_MODE_LABELS.keys()),
+            format_func=lambda value: DATA_MODE_LABELS[value],
+            key="data_mode",
+        )
+        if st.session_state["data_mode"] == "demo":
+            st.info("Demo mode gebruikt alleen mockdata en schrijft nooit naar Google Sheets.")
+    return st.session_state["data_mode"]
+
+
+def render_refresh_control(source_label: str, data_mode: str) -> None:
     _, data_col, portfolio_col = st.columns([1, 0.22, 0.24], gap="medium")
     with data_col:
-        if st.button("Data verversen", type="secondary"):
-            refresh_data()
+        if st.button("Data opnieuw laden", type="secondary", key="reload_data_button"):
+            refresh_data("Data opnieuw geladen.")
     with portfolio_col:
-        if st.button("Portfolio bijwerken", type="secondary"):
-            update_portfolio_and_reload(source_label)
+        if st.button("Portfolio bijwerken", type="secondary", key="refresh_portfolio_button"):
+            update_portfolio_and_reload(source_label, data_mode)
 
 
-def update_portfolio_and_reload(source_label: str) -> None:
+def render_navigation() -> str:
+    st.session_state.setdefault("active_tab", "Dashboard")
+    return st.radio(
+        "Navigatie",
+        APP_TABS,
+        horizontal=True,
+        key="active_tab",
+        label_visibility="collapsed",
+    )
+
+
+def update_portfolio_and_reload(source_label: str, data_mode: str) -> None:
+    if data_mode == "demo":
+        st.info("Portfolio bijwerken is uitgeschakeld in Demo / Mockdata mode.")
+        return
+
     if source_label != "Live Google Sheets":
         st.info("Portfolio bijwerken is alleen beschikbaar in Live Google Sheets mode.")
         return
 
     if not is_apps_script_refresh_configured():
-        st.info("Apps Script refresh is nog niet geconfigureerd.")
+        st.info("Portfolio bijwerken is nog niet geconfigureerd.")
         return
 
     with st.spinner("Portfolio bijwerken..."):
@@ -85,10 +120,13 @@ def update_portfolio_and_reload(source_label: str) -> None:
         st.error(result.message)
 
 
-def handle_write_success(action_label: str) -> None:
+def handle_write_success(action_message: str) -> None:
     if not is_apps_script_refresh_configured():
         refresh_data(
-            f"{action_label} opgeslagen. Portfolio bijwerken is nog niet geconfigureerd.",
+            (
+                f"{action_message} in Google Sheets. "
+                "Portfolio bijwerken is nog niet geconfigureerd. Data opnieuw geladen."
+            ),
             level="info",
         )
         return
@@ -97,11 +135,19 @@ def handle_write_success(action_label: str) -> None:
         result = refresh_portfolio_via_apps_script()
 
     if result.ok:
-        refresh_data(f"{action_label} opgeslagen. Portfolio bijgewerkt en data opnieuw geladen.")
+        refresh_data(
+            (
+                f"{action_message} in Google Sheets. "
+                "Portfolio bijgewerkt. Data opnieuw geladen."
+            )
+        )
         return
 
     refresh_data(
-        f"{action_label} opgeslagen, maar Portfolio bijwerken faalde. Data opnieuw geladen. {result.message}",
+        (
+            f"{action_message} in Google Sheets, maar Portfolio bijwerken mislukt. "
+            f"Data opnieuw geladen. Gebruik Portfolio bijwerken om opnieuw te proberen. {result.message}"
+        ),
         level="warning",
     )
 
@@ -109,7 +155,9 @@ def handle_write_success(action_label: str) -> None:
 def main() -> None:
     inject_global_styles()
 
-    data = get_data()
+    data_mode = render_data_mode_control()
+    force_mock = data_mode == "demo"
+    data = get_data(force_mock)
     render_app_header(
         APP_CONFIG.page_title,
         APP_CONFIG.phase_label,
@@ -123,31 +171,32 @@ def main() -> None:
         with st.expander("Debug Google Sheets"):
             st.caption("Veilige diagnostiek. Secrets en volledige Sheet-ID worden niet getoond.")
             st.json(data.google_debug)
-    render_refresh_control(data.source_label)
-    write_enabled = data.source_label == "Live Google Sheets"
+    render_refresh_control(data.source_label, data_mode)
+    write_enabled = data_mode == "live" and data.source_label == "Live Google Sheets"
 
-    dashboard_tab, portfolio_tab, transaction_tab, saldi_tab = st.tabs(
-        ["Dashboard", "Portfolio", "Transactie", "Saldi"]
-    )
+    active_tab = render_navigation()
 
-    with dashboard_tab:
+    if active_tab == "Dashboard":
         render_dashboard(data.portfolio, data.saldi, data.historie, data.dividend_total)
 
-    with portfolio_tab:
+    elif active_tab == "Portfolio":
         render_portfolio_table(data.portfolio, data.historie)
 
-    with transaction_tab:
+    elif active_tab == "Transactie":
         render_transaction_form(
             data.portfolio,
+            data.transactions,
             write_enabled=write_enabled,
-            on_write_success=lambda: handle_write_success("Transactie"),
+            on_write_success=lambda: handle_write_success("Transactie opgeslagen"),
+            on_delete_success=lambda: handle_write_success("Transactie verwijderd"),
+            refresh_configured=data_mode == "live" and is_apps_script_refresh_configured(),
         )
 
-    with saldi_tab:
+    elif active_tab == "Saldi":
         render_saldi_form(
             data.saldi,
             write_enabled=write_enabled,
-            on_write_success=lambda: handle_write_success("Saldo"),
+            on_write_success=lambda: handle_write_success("Saldo opgeslagen"),
         )
 
 

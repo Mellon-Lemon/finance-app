@@ -225,6 +225,10 @@ def inject_global_styles() -> None:
                 padding: 0.4rem 0.75rem;
             }
 
+            div[role="radiogroup"] {
+                gap: 0.35rem;
+            }
+
             div[data-testid="stForm"] {
                 background: var(--secondary-background-color);
                 border: 1px solid var(--fc-border);
@@ -256,6 +260,62 @@ def inject_global_styles() -> None:
                 border-radius: 8px;
                 max-height: 220px;
                 object-fit: cover;
+            }
+
+            .fc-holding-card {
+                border: 1px solid var(--fc-border-soft);
+                border-radius: 8px;
+                margin-bottom: 0.55rem;
+                padding: 0.78rem 0.85rem;
+            }
+
+            .fc-holding-head {
+                align-items: baseline;
+                display: flex;
+                justify-content: space-between;
+                gap: 0.7rem;
+                margin-bottom: 0.55rem;
+            }
+
+            .fc-holding-head strong {
+                color: var(--text-color);
+                font-size: 1.08rem;
+                font-weight: 850;
+                line-height: 1.1;
+            }
+
+            .fc-holding-head span {
+                color: var(--fc-muted);
+                font-size: 0.86rem;
+                font-weight: 760;
+                text-align: right;
+            }
+
+            .fc-holding-grid {
+                display: grid;
+                grid-template-columns: minmax(4.5rem, 0.7fr) minmax(0, 1.3fr);
+                row-gap: 0.28rem;
+            }
+
+            .fc-holding-grid span {
+                color: var(--fc-muted);
+                font-size: 0.8rem;
+                font-weight: 750;
+            }
+
+            .fc-holding-grid strong {
+                color: var(--text-color);
+                font-size: 0.88rem;
+                font-weight: 820;
+                text-align: right;
+            }
+
+            .fc-holding-profit--positive {
+                color: #15803d !important;
+            }
+
+            .fc-holding-profit--negative {
+                color: #b91c1c !important;
             }
         </style>
         """,

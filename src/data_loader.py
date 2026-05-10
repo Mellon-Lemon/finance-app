@@ -11,7 +11,7 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from src.mock_data import MockFinanceData, load_mock_data
-from src.sheets_client import GoogleSheetsClient
+from src.sheets_client import GoogleSheetsClient, TRANSACTION_COLUMNS
 
 
 LOGGER = logging.getLogger(__name__)
@@ -44,9 +44,19 @@ HISTORIE_COLUMNS = [
     "BTC Aant.",
     "Inleg Tot.",
 ]
+TRANSACTION_VIEW_COLUMNS = ["Sheet rij", "Datum", "Ticker", "Type", "Aantal", "Totaal", "Valuta"]
 
 
-def load_finance_data() -> MockFinanceData:
+def load_finance_data(force_mock: bool = False) -> MockFinanceData:
+    if force_mock:
+        return ensure_finance_data_contract(
+            load_mock_data(),
+            source_label="Demo / Mockdata",
+            source_message="Veilige demo",
+            source_warning="Demo mode actief. Er wordt niets gelezen uit of geschreven naar Google Sheets.",
+            google_debug={},
+        )
+
     diagnostics = build_google_sheets_diagnostics()
     _log_google_sheets_diagnostics(diagnostics)
 
@@ -82,7 +92,7 @@ def load_google_sheets_data(client: GoogleSheetsClient) -> MockFinanceData:
     if portfolio.empty or saldi.empty or historie.empty:
         raise ValueError("Een of meer verplichte Google Sheets tabs bevatten geen data.")
 
-    transactions = client.try_get_records("Transacties")
+    transactions = client.try_get_transaction_rows()
     dividend_total = calculate_dividend_total(transactions)
 
     if dividend_total is None:
@@ -93,6 +103,7 @@ def load_google_sheets_data(client: GoogleSheetsClient) -> MockFinanceData:
         saldi=saldi,
         historie=historie,
         dividend_total=dividend_total,
+        transactions=parse_transaction_sheet(transactions),
     )
 
 
@@ -115,6 +126,7 @@ def ensure_finance_data_contract(
         if source_warning is not None
         else getattr(data, "source_warning", ""),
         "google_debug": google_debug if google_debug is not None else getattr(data, "google_debug", {}),
+        "transactions": getattr(data, "transactions", pd.DataFrame(columns=TRANSACTION_VIEW_COLUMNS)),
     }
     try:
         return replace(data, **values)
@@ -248,6 +260,31 @@ def calculate_dividend_total(records: Iterable[dict[str, object]]) -> float | No
     return total if found_dividend else None
 
 
+def parse_transaction_sheet(records: Iterable[dict[str, object]]) -> pd.DataFrame:
+    rows: list[dict[str, object]] = []
+    for record in records:
+        ticker = str(_get_cell(record, ["Ticker"]) or "").strip()
+        if not ticker:
+            continue
+
+        rows.append(
+            {
+                "Sheet rij": _parse_sheet_row(record.get("Sheet rij")),
+                "Datum": str(_get_cell(record, ["Datum"]) or "").strip(),
+                "Ticker": ticker,
+                "Type": str(_get_cell(record, ["Type"]) or "").strip(),
+                "Aantal": _get_cell(record, ["Aantal"]) or "",
+                "Prijs per stuk": _get_cell(record, ["Prijs per stuk"]) or "",
+                "Kosten": _get_cell(record, ["Kosten"]) or "",
+                "Totaal": _get_cell(record, ["Totaal"]) or "",
+                "Valuta": str(_get_cell(record, ["Valuta"]) or "").strip(),
+            }
+        )
+
+    columns = ["Sheet rij", *TRANSACTION_COLUMNS]
+    return pd.DataFrame(rows, columns=columns)
+
+
 def parse_number(value: object) -> float | None:
     if value is None:
         return None
@@ -293,6 +330,13 @@ def parse_date(value: object):
     if isinstance(value, int | float):
         return pd.to_datetime(value, unit="D", origin="1899-12-30", errors="coerce")
     return pd.to_datetime(value, dayfirst=True, errors="coerce")
+
+
+def _parse_sheet_row(value: object) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _credentials_path() -> Path | None:
