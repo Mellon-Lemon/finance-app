@@ -4,12 +4,14 @@ Mobile-friendly Streamlit portfolio dashboard bovenop een bestaande Google Sheet
 
 ## Projectstatus
 
-Fase 4 is actief:
+Fase 4.5A is actief:
 
 - Google Sheets live data werkt.
 - Mockdata fallback blijft beschikbaar.
 - Write-back is beschikbaar voor `Transacties` en `Saldi`.
 - Write-back werkt alleen in `Live Google Sheets` mode.
+- Handmatig data verversen leest Google Sheets opnieuw in.
+- Optioneel kan Streamlit `refreshPortfolioOnly()` aanroepen via een Apps Script Web App endpoint.
 
 Niet gebouwd:
 
@@ -37,6 +39,13 @@ GOOGLE_SHEET_ID=your-google-sheet-id
 GOOGLE_SERVICE_ACCOUNT_FILE=credentials/service-account.json
 ```
 
+Optioneel voor `Portfolio bijwerken` via Apps Script:
+
+```env
+APPS_SCRIPT_REFRESH_URL=https://script.google.com/macros/s/.../exec
+APPS_SCRIPT_REFRESH_SECRET=your-refresh-secret
+```
+
 Plaats het service-account JSON-bestand lokaal, bijvoorbeeld:
 
 ```text
@@ -62,6 +71,33 @@ De app kiest automatisch de best beschikbare databron:
 Write-back is alleen actief bij `Live Google Sheets`.
 
 In `Mockdata` en `Fallback actief` blijven previews werken, maar schrijft de app nooit naar Google Sheets.
+
+## Verversen En Bijwerken
+
+Gebruik `Data verversen` om de Streamlit cache te legen en de gegevens opnieuw uit Google Sheets te lezen.
+
+Deze knop:
+
+- leest alleen opnieuw
+- schrijft niets naar `Historie`
+- triggert geen Apps Script
+- verstuurt geen e-mail
+- haalt geen live koersdata buiten de bestaande Sheet op
+- werkt veilig in `Mockdata` en `Fallback actief`
+
+Gebruik `Portfolio bijwerken` om het Apps Script Web App endpoint aan te roepen. Deze actie:
+
+- roept alleen `refreshPortfolioOnly()` aan
+- werkt het `Portfolio` tabblad bij via Apps Script
+- schrijft niet naar `Historie`
+- roept `dailyPortfolioSnapshot()` niet aan
+- verstuurt geen e-mail
+- leest daarna de Google Sheets data opnieuw
+- werkt alleen in `Live Google Sheets` mode met `APPS_SCRIPT_REFRESH_URL` en `APPS_SCRIPT_REFRESH_SECRET`
+
+Als de Apps Script endpoint-configuratie ontbreekt, blijft de app werken en blijft `Data verversen` beschikbaar. Na een succesvolle transactie- of saldi-write probeert de app `Portfolio bijwerken` automatisch uit te voeren als dit geconfigureerd is.
+
+De dagelijkse snapshot blijft buiten Streamlit: Apps Script voert `dailyPortfolioSnapshot()` apart uit via de 22:00 trigger.
 
 ## Google Sheets
 
@@ -121,9 +157,10 @@ Commit nooit secrets:
 - `.env`
 - `credentials/`
 - service-account keys
+- Apps Script refresh secret
 - token files
 
-De service-account key blijft lokaal geheim. De app toont geen credentials-inhoud en geen volledige Spreadsheet IDs.
+De service-account key en Apps Script secret blijven lokaal geheim. De app toont geen credentials-inhoud, geen volledige Spreadsheet IDs en geen refresh secret.
 
 ## Debug
 

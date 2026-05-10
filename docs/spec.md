@@ -27,19 +27,23 @@ De Streamlit app is de frontend/interface voor:
 Huidige status:
 
 - App title: `Portfolio`
-- Fase 4 actief
+- Fase 4.5A actief
 - Streamlit frontend
 - Live Google Sheets integratie actief
 - Mockdata fallback actief
 - Write-back alleen voor `Transacties` en `Saldi`
+- Handmatige data-refresh leest Google Sheets opnieuw
+- Optionele Apps Script Web App refresh voor `refreshPortfolioOnly()`
 
 Niet gebouwd:
 
 - write-back naar `Portfolio`
 - write-back naar `Historie`
 - write-back naar `Instellingen`
-- Apps Script triggers vanuit de app
 - automatische koersdata ophalen
+- `dailyPortfolioSnapshot()` vanuit Streamlit
+- Historie snapshots schrijven vanuit Streamlit
+- e-mail versturen vanuit Streamlit
 - deploy
 
 ## Architectuur
@@ -74,6 +78,64 @@ In `Mockdata` en `Fallback actief`:
 - opslaan is niet beschikbaar
 - er wordt nooit naar Google Sheets geschreven
 
+## Handmatige Data-Refresh
+
+Fase 4.5A voegt een knop `Data verversen` toe.
+
+Doel:
+
+- Streamlit cache legen
+- Google Sheets opnieuw lezen via de bestaande data-loader
+- app opnieuw renderen
+
+De refresh mag alleen lezen.
+
+De refresh doet niet:
+
+- Apps Script triggeren
+- `updatePortfolio` starten
+- naar `Historie` schrijven
+- e-mail versturen
+- live koersdata ophalen buiten de bestaande Sheet
+- nieuwe write-back toevoegen
+
+De knop werkt veilig in alle datamodes:
+
+- `Live Google Sheets`
+- `Mockdata`
+- `Fallback actief`
+
+Na succesvolle write-back naar `Transacties` of `Saldi` mag de app dezelfde refresh uitvoeren om stale data te vermijden.
+
+## Portfolio Bijwerken
+
+De app kan optioneel een Apps Script Web App endpoint aanroepen met de knop `Portfolio bijwerken`.
+
+Doel:
+
+- Apps Script `refreshPortfolioOnly()` uitvoeren
+- het `Portfolio` tabblad laten bijwerken door de bestaande Apps Script engine
+- daarna Streamlit cache legen en Google Sheets opnieuw lezen
+
+Deze actie is logisch gescheiden van `Data verversen`.
+
+`Portfolio bijwerken` doet niet:
+
+- naar `Historie` schrijven
+- `dailyPortfolioSnapshot()` aanroepen
+- e-mail versturen
+- rechtstreeks naar het `Portfolio` tabblad schrijven vanuit Python
+- Google Finance of portfolioformules vervangen
+
+De knop werkt alleen in `Live Google Sheets` mode en alleen als de Apps Script configuratie aanwezig is. In `Mockdata` en `Fallback actief` toont de app een nette melding en wordt geen echte update geprobeerd.
+
+Na succesvolle write-back naar `Transacties` of `Saldi`:
+
+- als de Apps Script endpoint-configuratie aanwezig is, roept de app automatisch `refreshPortfolioOnly()` aan en leest daarna Google Sheets opnieuw
+- als de configuratie ontbreekt, blijft de write-back geslaagd en toont de app dat Portfolio bijwerken nog niet geconfigureerd is
+
+De dagelijkse snapshot blijft apart in Apps Script via de 22:00 trigger. Streamlit roept die snapshot niet aan.
+
 ## Configuratie
 
 Google Sheets integratie gebruikt service-account authenticatie.
@@ -90,7 +152,11 @@ Optioneel:
 ```env
 GOOGLE_APPLICATION_CREDENTIALS=credentials/service-account.json
 PORTFOLIO_DEBUG_GOOGLE=0
+APPS_SCRIPT_REFRESH_URL=https://script.google.com/macros/s/.../exec
+APPS_SCRIPT_REFRESH_SECRET=...
 ```
+
+`APPS_SCRIPT_REFRESH_URL` en `APPS_SCRIPT_REFRESH_SECRET` zijn alleen nodig voor `Portfolio bijwerken`. De secret wordt via de JSON body naar het Web App endpoint gestuurd en mag niet hardcoded, gelogd of volledig in de UI getoond worden.
 
 De Google Sheet moet met editorrechten gedeeld worden met het `client_email` adres uit het service-account JSON-bestand.
 
@@ -308,7 +374,11 @@ Geschreven tabs:
 - `Transacties`
 - `Saldi`
 
-Niet geschreven tabs:
+Indirect bijgewerkt door Apps Script via `refreshPortfolioOnly()`:
+
+- `Portfolio`
+
+Niet rechtstreeks geschreven door Streamlit:
 
 - `Portfolio`
 - `Historie`
@@ -405,7 +475,10 @@ Niet bouwen in fase 4:
 - bestaande transacties verwijderen
 - saldi-rijen toevoegen of verwijderen
 - Apps Script vervangen
-- Apps Script triggers vanuit Streamlit
+- Apps Script `dailyPortfolioSnapshot()` vanuit Streamlit
+- `Data verversen` die Apps Script triggert
+- refresh die `Historie` schrijft
+- e-mailnotificaties
 - Google Finance vervangen
 - ROI-engine herbouwen
 - automatische snapshots maken
@@ -429,6 +502,7 @@ finance-app/
 |   `-- header-placeholder.svg
 `-- src/
     |-- __init__.py
+    |-- apps_script_client.py
     |-- config.py
     |-- dashboard.py
     |-- data_loader.py
