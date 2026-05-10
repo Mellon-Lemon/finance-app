@@ -18,6 +18,7 @@ Fase 5B is actief:
 - Navigatie blijft op de actieve sectie na interacties.
 - Portfolio heeft een compacte, mobielvriendelijke holdingsweergave.
 - Demo / Mockdata mode is handmatig beschikbaar om de app veilig te tonen zonder privédata.
+- De UI gebruikt een mobile-first app-shell met compacte status-/actiebalk en icon-navigatie.
 
 Niet gebouwd:
 
@@ -68,7 +69,7 @@ python -m streamlit run app.py
 
 ## Datamodes
 
-De app heeft een handmatige `Datamodus` in de sidebar:
+De app heeft een handmatige `Datamodus` in de compacte actiebalk boven de navigatie:
 
 - `Live Google Sheets`: gebruikt echte Google Sheets data wanneer `.env`, credentials en Sheet geldig zijn.
 - `Demo / Mockdata`: gebruikt altijd lokale mockdata en probeert geen Google Sheets of Apps Script aan te roepen.
@@ -76,7 +77,18 @@ De app heeft een handmatige `Datamodus` in de sidebar:
 
 Write-back, delete en `Portfolio bijwerken` zijn alleen actief bij echte `Live Google Sheets` data.
 
-In `Demo / Mockdata` en `Fallback actief` blijven previews werken, maar schrijft of verwijdert de app nooit iets in Google Sheets. Demo mode is bedoeld voor demonstraties en screenshots zonder echte financiële data.
+In `Demo / Mockdata` en `Fallback actief` blijven previews werken, maar schrijft of verwijdert de app nooit iets in Google Sheets. Demo mode is bedoeld voor demonstraties en screenshots zonder echte financiële data en gebruikt fictieve holdings, saldi, historie, dividend en transacties.
+
+## UX Structuur
+
+De app is ingedeeld als mobile-first finance app:
+
+- Dashboard: rustige cockpit met totaal vermogen, kern-KPI's en targets.
+- Portfolio: holdings als cards, compacte filters, optionele tabel en analysevisuals.
+- Transactie: snelle invoerflow, recente transacties en verborgen correctieflow.
+- Saldi: compact cashbeheer en saldo wijzigen.
+
+De app-shell gebruikt een compacte header, statusbadge, actiebar en icon-navigatie. Grafieken en detailanalyse staan op Portfolio, niet op Dashboard. De actieve sectie blijft behouden na interacties en reruns.
 
 ## Opnieuw Laden En Bijwerken
 
@@ -132,7 +144,7 @@ De app gebruikt de scope:
 https://www.googleapis.com/auth/spreadsheets
 ```
 
-Nederlandse getalnotatie wordt centraal geparsed, bijvoorbeeld `0,46499113`, `EUR 22.465,00` en `40,95%`.
+Nederlandse getalnotatie wordt centraal geparsed, bijvoorbeeld `0,12345678`, `EUR 12.345,67` en `40,95%`.
 
 ## Transacties
 
@@ -157,7 +169,7 @@ De Transactie-tab toont ook `Recente transacties` met de laatste 10 transacties.
 
 Veilige correcties zijn beschikbaar in `Live Google Sheets` mode:
 
-- klik eerst op `Transactie verwijderen`
+- klik eerst op de kleine verwijderactie bij een recente transactie of `Correctie verwijderen`
 - kies een ticker
 - bekijk maximaal de laatste 3 transacties voor die ticker
 - selecteer exact een rij
@@ -170,13 +182,13 @@ De delete-flow gebruikt expliciete widget keys, zodat het verwijderpaneel zonder
 
 ## Portfolio
 
-De Portfolio-weergave gebruikt standaard compacte, scanbare holdings. De tabelweergave blijft beschikbaar door `Compacte weergave` uit te zetten.
+De Portfolio-weergave gebruikt standaard compacte, scanbare holdings-cards. De tabelweergave blijft beschikbaar in de expander `Tabelweergave`.
 
 - `Categorie` staat niet meer in de holdings-tabel
 - `Ingelegd vermogen` heet `Inleg`
 - bedragen tonen `€`
 - aantallen, winst/verlies en ROI worden compact geformatteerd
-- de compacte weergave voorkomt brede mobiele tabellen
+- holdings-cards voorkomen brede mobiele tabellen als primaire ervaring
 
 ## Saldi
 

@@ -5,9 +5,14 @@ import logging
 import pandas as pd
 import streamlit as st
 
-from src.formatting import format_currency, signed_currency
+from src.formatting import format_currency, format_profit
 from src.sheets_client import GoogleSheetsClient
-from src.ui import MetricCard, render_metric_card, render_metric_grid, render_section_header
+from src.ui import (
+    render_balance_card,
+    render_primary_metric_card,
+    render_section_header,
+    render_success_panel,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -28,13 +33,27 @@ def render_saldi_form(
 
 def _render_cash_overview(saldi: pd.DataFrame) -> None:
     total_cash = float(saldi["Huidig Saldo"].sum())
-    render_metric_card(MetricCard("Totaal cashsaldo", format_currency(total_cash)))
+    render_primary_metric_card(
+        "Totaal cashsaldo",
+        format_currency(total_cash),
+        "Spaar, vakanties en vrije ruimte",
+    )
 
-    cards = [
-        MetricCard(row["Account"], format_currency(float(row["Huidig Saldo"])))
-        for _, row in saldi.iterrows()
-    ]
-    render_metric_grid(cards)
+    columns = st.columns(min(len(saldi), 3) or 1, gap="medium")
+    icons = {
+        "Spaar": "◎",
+        "Vakanties": "⌂",
+        "Vrije ruimte": "✦",
+    }
+    for column, (_, row) in zip(columns, saldi.iterrows()):
+        account = str(row["Account"])
+        with column:
+            render_balance_card(
+                account,
+                format_currency(float(row["Huidig Saldo"])),
+                "Huidig saldo",
+                icons.get(account, ""),
+            )
 
 
 def _render_adjustment_form(
@@ -43,30 +62,33 @@ def _render_adjustment_form(
     on_write_success,
 ) -> None:
     with st.container(border=True):
-        account = st.selectbox("Account", saldi["Account"].tolist())
+        account_col, value_col = st.columns([1, 1], gap="medium")
+        with account_col:
+            account = st.selectbox("Account", saldi["Account"].tolist(), key="saldo_account_select")
         current_balance = float(
             saldi.loc[saldi["Account"] == account, "Huidig Saldo"].iloc[0]
         )
-        new_balance = st.number_input(
-            "Nieuwe waarde",
-            min_value=0.0,
-            value=current_balance,
-            step=50.0,
-            format="%.2f",
-        )
+        with value_col:
+            new_balance = st.number_input(
+                "Nieuwe waarde",
+                min_value=0.0,
+                value=current_balance,
+                step=50.0,
+                format="%.2f",
+                key="saldo_new_balance",
+            )
         difference = new_balance - current_balance
 
-        current_col, new_col, diff_col = st.columns(3, gap="medium")
-        with current_col:
-            st.metric("Huidige waarde", format_currency(current_balance))
-        with new_col:
-            st.metric("Nieuwe waarde", format_currency(new_balance))
-        with diff_col:
-            st.metric("Verschil", signed_currency(difference))
+        render_success_panel(
+            "Wijziging",
+            format_profit(difference),
+            f"Van {format_currency(current_balance)} naar {format_currency(new_balance)}",
+        )
 
         preview = build_saldo_preview(account, current_balance, new_balance)
         errors = validate_saldo_update(saldi, account, new_balance)
-        st.dataframe(pd.DataFrame([preview]), hide_index=True, width="stretch")
+        with st.expander("Preview"):
+            st.dataframe(pd.DataFrame([preview]), hide_index=True, width="stretch")
 
         if errors:
             st.warning("Controleer de wijziging voordat je opslaat.")
@@ -89,7 +111,7 @@ def _render_adjustment_form(
             or already_saved
             or st.session_state.get("saldo_save_in_progress", False)
         )
-        if st.button("Saldo opslaan", disabled=disabled):
+        if st.button("Saldo opslaan", disabled=disabled, key="saldo_save_button", type="primary"):
             _save_saldo(account, float(new_balance), preview_key, on_write_success)
 
 

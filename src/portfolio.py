@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from html import escape
-
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -13,17 +11,17 @@ from src.formatting import (
     format_quantity,
     format_quantity_with_unit,
 )
-from src.ui import render_section_header
+from src.ui import render_empty_state, render_holding_card, render_section_header
 
 
 def render_portfolio_table(portfolio: pd.DataFrame, historie: pd.DataFrame) -> None:
     portfolio_view = _prepare_portfolio(portfolio)
     category_summary = _build_category_summary(portfolio_view)
 
-    render_section_header("Holdings", "Portfolio tabel")
-    _render_holdings_table(portfolio_view)
+    render_section_header("Holdings", "Portfolio")
+    _render_holdings(portfolio_view)
 
-    render_section_header("Detail", "Portfolio analyse")
+    render_section_header("Analyse", "Portfolio detail")
     _render_category_visuals(category_summary)
     _render_history_visuals(category_summary, historie)
 
@@ -46,30 +44,28 @@ def _build_category_summary(portfolio: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def _render_holdings_table(portfolio_view: pd.DataFrame) -> None:
-    with st.container(border=True):
-        filter_col, view_col = st.columns([1, 0.7], gap="medium")
-        with filter_col:
-            categories = ["Alles", "Crypto", "Aandelen"]
-            selected_category = st.radio(
-                "Categorie",
-                categories,
-                horizontal=True,
-                key="portfolio_category_filter",
-            )
-        with view_col:
-            compact_view = st.toggle("Compacte weergave", value=True, key="portfolio_compact_view")
-
-        filtered = (
-            portfolio_view
-            if selected_category == "Alles"
-            else portfolio_view.loc[portfolio_view["Categorie"] == selected_category]
+def _render_holdings(portfolio_view: pd.DataFrame) -> None:
+    filter_col, count_col = st.columns([1, 0.38], gap="medium")
+    with filter_col:
+        categories = ["Alles", "Crypto", "Aandelen"]
+        selected_category = st.radio(
+            "Categorie",
+            categories,
+            horizontal=True,
+            key="portfolio_category_filter",
         )
 
-        if compact_view:
-            _render_holdings_cards(filtered)
-            return
+    filtered = (
+        portfolio_view
+        if selected_category == "Alles"
+        else portfolio_view.loc[portfolio_view["Categorie"] == selected_category]
+    )
+    with count_col:
+        st.caption(f"{len(filtered)} holdings")
 
+    _render_holdings_cards(filtered)
+
+    with st.expander("Tabelweergave"):
         table = _format_holdings_table(filtered)
         st.dataframe(
             table,
@@ -109,28 +105,21 @@ def _format_holdings_table(portfolio_view: pd.DataFrame) -> pd.DataFrame:
 
 
 def _render_holdings_cards(portfolio_view: pd.DataFrame) -> None:
+    if portfolio_view.empty:
+        render_empty_state("Geen holdings", "Er zijn geen posities voor dit filter.")
+        return
+
     for _, row in portfolio_view.iterrows():
         ticker = str(row["Ticker"])
         profit = float(row["Winst"])
-        tone = "positive" if profit > 0 else "neutral"
-        if profit < 0:
-            tone = "negative"
-        st.markdown(
-            (
-                '<div class="fc-holding-card">'
-                '<div class="fc-holding-head">'
-                f'<strong>{escape(ticker)}</strong>'
-                f'<span>{escape(format_quantity_with_unit(float(row["Aantal"]), ticker))}</span>'
-                '</div>'
-                '<div class="fc-holding-grid">'
-                f'<span>Inleg</span><strong>{escape(format_currency_eur(float(row["Inleg"])))}</strong>'
-                f'<span>Waarde</span><strong>{escape(format_currency_eur(float(row["Waarde"])))}</strong>'
-                f'<span>Winst</span><strong class="fc-holding-profit--{tone}">{escape(format_profit(float(row["Winst"])))}</strong>'
-                f'<span>ROI</span><strong>{escape(format_percent(float(row["ROI %"]), 1))}</strong>'
-                '</div>'
-                '</div>'
-            ),
-            unsafe_allow_html=True,
+        render_holding_card(
+            ticker=ticker,
+            quantity=format_quantity_with_unit(float(row["Aantal"]), ticker),
+            invested=format_currency_eur(float(row["Inleg"])),
+            value=format_currency_eur(float(row["Waarde"])),
+            profit=format_profit(profit),
+            roi=format_percent(float(row["ROI %"]), 1),
+            profit_value=profit,
         )
 
 
@@ -138,15 +127,15 @@ def _render_category_visuals(summary: pd.DataFrame) -> None:
     value_col, input_col = st.columns([1, 1], gap="medium")
     with value_col:
         with st.container(border=True):
-            st.caption("WAARDE PER CATEGORIE")
+            st.caption("Waarde per categorie")
             st.plotly_chart(_build_value_distribution(summary), width="stretch")
     with input_col:
         with st.container(border=True):
-            st.caption("INLEG")
+            st.caption("Inleg per categorie")
             st.plotly_chart(_build_invested_by_category(summary), width="stretch")
 
     with st.container(border=True):
-        st.caption("WINST / VERLIES PER CATEGORIE")
+        st.caption("Winst / verlies per categorie")
         st.plotly_chart(_build_profit_by_category(summary), width="stretch")
 
 
@@ -154,11 +143,11 @@ def _render_history_visuals(summary: pd.DataFrame, historie: pd.DataFrame) -> No
     invested_col, history_col = st.columns([1, 1], gap="medium")
     with invested_col:
         with st.container(border=True):
-            st.caption("BELEGD VS INLEG")
+            st.caption("Belegd vs inleg")
             st.plotly_chart(_build_invested_total(summary), width="stretch")
     with history_col:
         with st.container(border=True):
-            st.caption("EQUITY CURVE")
+            st.caption("Historische winst/verlies")
             st.plotly_chart(_build_history_chart(historie), width="stretch")
 
 
@@ -175,7 +164,7 @@ def _build_value_distribution(summary: pd.DataFrame):
         },
     )
     fig.update_layout(
-        height=260,
+        height=220,
         legend_title_text="",
         margin=dict(l=4, r=4, t=4, b=4),
         paper_bgcolor="rgba(0,0,0,0)",
@@ -262,7 +251,7 @@ def _build_history_chart(historie: pd.DataFrame):
     )
     fig.update_traces(line_width=2.5)
     fig.update_layout(
-        height=260,
+        height=220,
         hovermode="x unified",
         legend_title_text="",
         legend=dict(orientation="h", y=-0.28, x=0, xanchor="left"),
@@ -277,7 +266,7 @@ def _build_history_chart(historie: pd.DataFrame):
 
 def _apply_bar_layout(fig) -> None:
     fig.update_layout(
-        height=260,
+        height=220,
         showlegend=False,
         margin=dict(l=4, r=4, t=4, b=4),
         paper_bgcolor="rgba(0,0,0,0)",

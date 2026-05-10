@@ -5,11 +5,12 @@ import plotly.express as px
 import streamlit as st
 
 from src.config import APP_CONFIG
-from src.formatting import format_currency, format_number, format_percent, signed_currency
+from src.formatting import format_currency, format_number, format_percent, format_quantity, signed_currency
 from src.ui import (
     MetricCard,
     PerformanceMetric,
-    render_metric_card,
+    render_metric_grid,
+    render_primary_metric_card,
     render_section_header,
     render_target_card,
 )
@@ -27,15 +28,11 @@ def render_dashboard(
     metrics = _calculate_metrics(portfolio, saldi, dividend_total)
     performance = _calculate_performance_metrics(metrics, historie)
 
-    render_section_header("Dashboard", "KPI overzicht")
+    render_section_header("Vandaag", "Cockpit")
     _render_kpis(metrics, performance)
 
-    render_section_header("Targets", "Voortgang")
+    render_section_header("Doelen", "Voortgang")
     _render_targets(metrics, historie)
-
-    render_section_header("Historie", "Equity curve")
-    with st.container(border=True):
-        st.plotly_chart(_build_history_chart(historie), width="stretch")
 
 
 def _calculate_metrics(
@@ -45,7 +42,9 @@ def _calculate_metrics(
 ) -> dict[str, float]:
     crypto_mask = portfolio["Categorie"] == "Crypto"
     stock_mask = portfolio["Categorie"] == "Aandelen"
-    btc_row = portfolio.loc[portfolio["Ticker"] == "BTC"].iloc[0]
+    btc_rows = portfolio.loc[portfolio["Ticker"] == "BTC"]
+    btc_amount = float(btc_rows["Aantal"].iloc[0]) if not btc_rows.empty else 0.0
+    btc_value = float(btc_rows["Waarde"].iloc[0]) if not btc_rows.empty else 0.0
 
     invested_value = float(portfolio["Waarde"].sum())
     invested_input = float(portfolio["Inleg"].sum())
@@ -71,8 +70,8 @@ def _calculate_metrics(
         "total_profit": total_profit,
         "crypto_profit": crypto_profit,
         "stock_profit": stock_profit,
-        "btc_amount": float(btc_row["Aantal"]),
-        "btc_value": float(btc_row["Waarde"]),
+        "btc_amount": btc_amount,
+        "btc_value": btc_value,
         "dividend_total": float(dividend_total),
     }
 
@@ -81,23 +80,11 @@ def _render_kpis(
     metrics: dict[str, float],
     performance: dict[str, tuple[PerformanceMetric, ...]],
 ) -> None:
-    total_card = MetricCard(
+    render_primary_metric_card(
         "Totaal vermogen",
         format_currency(metrics["total_wealth"]),
         "Cash + actuele beleggingswaarde",
-        variant="primary",
     )
-    dividend_card = MetricCard(
-        "Dividend totaal",
-        format_currency(metrics["dividend_total"]),
-        "Ontvangen dividend",
-        variant="secondary",
-    )
-    top_left, top_right = st.columns([2, 1], gap="medium")
-    with top_left:
-        render_metric_card(total_card)
-    with top_right:
-        render_metric_card(dividend_card)
 
     performance_cards = [
         MetricCard(
@@ -107,6 +94,14 @@ def _render_kpis(
             signed_currency(metrics["total_profit"]),
             performance["invested"],
             "performance",
+        ),
+        MetricCard(
+            "Cash",
+            format_currency(metrics["cash_total"]),
+            "",
+            None,
+            (),
+            "standard",
         ),
         MetricCard(
             "Crypto",
@@ -124,11 +119,16 @@ def _render_kpis(
             performance["stocks"],
             "performance",
         ),
+        MetricCard(
+            "Dividend totaal",
+            format_currency(metrics["dividend_total"], decimals=2),
+            "",
+            None,
+            (),
+            "standard",
+        ),
     ]
-    cols = st.columns(3, gap="medium")
-    for col, card in zip(cols, performance_cards):
-        with col:
-            render_metric_card(card)
+    render_metric_grid(performance_cards, columns=2)
 
 
 def _calculate_performance_metrics(
@@ -202,11 +202,9 @@ def _get_history_value_on_or_before(
 
 
 def _render_targets(metrics: dict[str, float], historie: pd.DataFrame) -> None:
-    total_wealth = _get_latest_history_value(historie, "Totaal") or metrics["total_wealth"]
-    invested_value = (
-        _get_latest_history_value(historie, "Belegd Vermogen") or metrics["invested_value"]
-    )
-    btc_amount = _get_latest_history_value(historie, "BTC Aant.") or metrics["btc_amount"]
+    total_wealth = metrics["total_wealth"]
+    invested_value = metrics["invested_value"]
+    btc_amount = metrics["btc_amount"]
 
     targets = [
         (
@@ -225,7 +223,7 @@ def _render_targets(metrics: dict[str, float], historie: pd.DataFrame) -> None:
         ),
         (
             "0.5 BTC",
-            f"{format_number(btc_amount, 8)} BTC",
+            f"{format_quantity(btc_amount, 'BTC')} BTC",
             f"{format_number(APP_CONFIG.target_btc_amount, 1)} BTC",
             btc_amount / APP_CONFIG.target_btc_amount,
             "",
@@ -288,5 +286,5 @@ def _build_history_chart(historie: pd.DataFrame):
         plot_bgcolor="rgba(0,0,0,0)",
     )
     fig.update_xaxes(title="", showgrid=False, tickformat="%b %y")
-    fig.update_yaxes(title="", gridcolor="rgba(148, 163, 184, 0.18)", tickprefix="EUR ")
+    fig.update_yaxes(title="", gridcolor="rgba(148, 163, 184, 0.18)", tickprefix="\u20ac ")
     return fig

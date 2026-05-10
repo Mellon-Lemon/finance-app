@@ -41,6 +41,7 @@ Huidige status:
 - Portfolio holdings hebben een compacte mobielvriendelijke weergave
 - Handmatige `Live Google Sheets` / `Demo / Mockdata` datamodus is beschikbaar
 - Delete-flow gebruikt unieke widget keys om duplicate element IDs te voorkomen
+- Mobile-first UX-refactor actief: compacte app-shell, actiebar, icon-navigatie en herbruikbare card-componenten
 
 Niet gebouwd:
 
@@ -82,6 +83,7 @@ De gekozen datamodus blijft in `session_state` staan tijdens reruns.
 In `Demo / Mockdata`:
 
 - `load_finance_data(force_mock=True)` laadt direct mockdata
+- mockdata bestaat uit fictieve holdings, saldi, historie, dividend en transacties
 - er wordt geen Google Sheets call gedaan
 - er wordt geen Apps Script call gedaan
 - er wordt niets naar Google Sheets geschreven
@@ -223,7 +225,7 @@ Deze expander mag geen credentials-inhoud of volledige Spreadsheet IDs tonen.
 
 ## Navigatiestructuur
 
-De app bevat vier hoofdsecties. De actieve sectie wordt in `session_state` bewaard zodat reruns na opslaan, verwijderen, filteren of saldo aanpassen niet terugvallen naar Dashboard.
+De app bevat een compacte button-based icon-navigatie met vier hoofdsecties. De actieve sectie wordt in `session_state` bewaard zodat reruns na opslaan, verwijderen, filteren of saldo aanpassen niet terugvallen naar Dashboard.
 
 1. Dashboard
 2. Portfolio
@@ -236,9 +238,11 @@ Dashboard is een clean cockpit-overzicht.
 
 Het dashboard bevat:
 
-- KPI overzicht
+- een primaire card voor totaal vermogen
+- compacte KPI-cards
 - target progress cards
-- equity curve
+
+Het dashboard bevat geen grote grafieken, detailtabellen, recente activiteit of correctiefunctionaliteit. Analysevisuals staan op Portfolio.
 
 KPI's:
 
@@ -266,8 +270,9 @@ Portfolio is het detail/analyse-tabblad.
 
 Volgorde:
 
-1. Holdings weergave
-2. Detailvisuals
+1. Holdings-cards met compacte filter
+2. Optionele tabelweergave in een expander
+3. Detailvisuals
 
 Holdings weergave:
 
@@ -285,14 +290,15 @@ UX-regels:
 - Aantallen worden compact geformatteerd: BTC maximaal 6 decimalen, hele aandelen zonder overbodige decimalen.
 - Winst/verlies toont plus/min waar logisch.
 - ROI toont 1 decimaal.
-- De compacte weergave toont holdings als cards/list-items en voorkomt brede mobiele tabellen.
+- Holdings worden primair als cards/list-items getoond en voorkomen brede mobiele tabellen.
+- De tabel is secundair en staat in `Tabelweergave`.
 
 Categorieen:
 
 - Crypto
 - Aandelen
 
-TSWE valt voor nu onder Aandelen.
+Onbekende niet-crypto tickers vallen voor nu onder Aandelen.
 
 ## Transactie-tab
 
@@ -348,7 +354,7 @@ Fase 5B bevat veilige correcties voor het tabblad `Transacties`.
 
 Flow:
 
-1. Gebruiker klikt op de compacte actie `Transactie verwijderen`.
+1. Gebruiker klikt op de kleine verwijderactie bij een recente transactie of op `Correctie verwijderen`.
 2. App toont pas daarna het verwijderpaneel.
 3. Gebruiker kiest een ticker.
 4. App toont maximaal de laatste 3 transacties voor die ticker.
@@ -549,11 +555,11 @@ Parsing staat centraal in `src/data_loader.py`.
 
 Ondersteunde voorbeelden:
 
-- `0,46499113` -> `0.46499113`
+- `0,12345678` -> `0.12345678`
 - `2` -> `2`
 - `426` -> `426`
 - `34,81` -> `34.81`
-- `EUR 22.465,00` -> `22465.00`
+- `EUR 12.345,67` -> `12345.67`
 - `40,95%` -> `40.95`
 - `8-5-2026`
 - `8-5-2026 22:10:34`

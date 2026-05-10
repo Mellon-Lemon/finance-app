@@ -15,10 +15,16 @@ from src.portfolio import render_portfolio_table
 from src.saldi import render_saldi_form
 from src.styles import inject_global_styles
 from src.transactions import render_transaction_form
-from src.ui import render_app_header
+from src.ui import render_action_bar, render_app_header, render_icon_nav
 
 
 APP_TABS = ["Dashboard", "Portfolio", "Transactie", "Saldi"]
+NAV_LABELS = {
+    "Dashboard": "\U0001f3e0 Dashboard",
+    "Portfolio": "\U0001f4ca Portfolio",
+    "Transactie": "\u2795 Transactie",
+    "Saldi": "\U0001f4b0 Saldi",
+}
 DATA_MODE_LABELS = {
     "live": "Live Google Sheets",
     "demo": "Demo / Mockdata",
@@ -27,7 +33,7 @@ DATA_MODE_LABELS = {
 st.set_page_config(
     page_title=APP_CONFIG.page_title,
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 
@@ -63,39 +69,18 @@ def render_status_message() -> None:
         st.info(message)
 
 
-def render_data_mode_control() -> str:
+def get_current_data_mode() -> str:
     st.session_state.setdefault("data_mode", "live")
-    with st.sidebar:
-        st.radio(
-            "Datamodus",
-            options=list(DATA_MODE_LABELS.keys()),
-            format_func=lambda value: DATA_MODE_LABELS[value],
-            key="data_mode",
-        )
-        if st.session_state["data_mode"] == "demo":
-            st.info("Demo mode gebruikt alleen mockdata en schrijft nooit naar Google Sheets.")
     return st.session_state["data_mode"]
-
-
-def render_refresh_control(source_label: str, data_mode: str) -> None:
-    _, data_col, portfolio_col = st.columns([1, 0.22, 0.24], gap="medium")
-    with data_col:
-        if st.button("Data opnieuw laden", type="secondary", key="reload_data_button"):
-            refresh_data("Data opnieuw geladen.")
-    with portfolio_col:
-        if st.button("Portfolio bijwerken", type="secondary", key="refresh_portfolio_button"):
-            update_portfolio_and_reload(source_label, data_mode)
 
 
 def render_navigation() -> str:
     st.session_state.setdefault("active_tab", "Dashboard")
-    return st.radio(
-        "Navigatie",
-        APP_TABS,
-        horizontal=True,
-        key="active_tab",
-        label_visibility="collapsed",
-    )
+    active_tab = st.session_state["active_tab"]
+    if active_tab not in APP_TABS:
+        active_tab = "Dashboard"
+        st.session_state["active_tab"] = active_tab
+    return render_icon_nav(active_tab, NAV_LABELS)
 
 
 def update_portfolio_and_reload(source_label: str, data_mode: str) -> None:
@@ -155,7 +140,7 @@ def handle_write_success(action_message: str) -> None:
 def main() -> None:
     inject_global_styles()
 
-    data_mode = render_data_mode_control()
+    data_mode = get_current_data_mode()
     force_mock = data_mode == "demo"
     data = get_data(force_mock)
     render_app_header(
@@ -171,7 +156,13 @@ def main() -> None:
         with st.expander("Debug Google Sheets"):
             st.caption("Veilige diagnostiek. Secrets en volledige Sheet-ID worden niet getoond.")
             st.json(data.google_debug)
-    render_refresh_control(data.source_label, data_mode)
+    render_action_bar(
+        data_mode_labels=DATA_MODE_LABELS,
+        source_label=data.source_label,
+        on_reload=lambda: refresh_data("Data opnieuw geladen."),
+        on_refresh=lambda: update_portfolio_and_reload(data.source_label, get_current_data_mode()),
+        refresh_disabled=data_mode != "live" or data.source_label != "Live Google Sheets",
+    )
     write_enabled = data_mode == "live" and data.source_label == "Live Google Sheets"
 
     active_tab = render_navigation()

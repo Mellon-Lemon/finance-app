@@ -6,9 +6,14 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
-from src.formatting import format_currency, format_currency_eur, format_quantity
+from src.formatting import format_currency, format_currency_eur, format_quantity, format_quantity_with_unit
 from src.sheets_client import GoogleSheetsClient, TRANSACTION_COLUMNS
-from src.ui import render_section_header
+from src.ui import (
+    render_empty_state,
+    render_price_result_card,
+    render_section_header,
+    render_transaction_item,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -105,8 +110,11 @@ def _render_transaction_amounts(
             )
 
         price = _calculate_price_per_unit(amount, total)
-        st.metric("Prijs per stuk", format_currency(price, currency, decimals=4))
-        st.caption("Berekend uit Aantal en Totaal.")
+        render_price_result_card(
+            "Prijs per stuk",
+            format_currency(price, currency, decimals=2),
+            "Berekend uit Aantal en Totaal.",
+        )
         return float(amount), price, float(total)
 
     min_total = 0.0 if transaction_type == "Dividend" else None
@@ -159,7 +167,7 @@ def _render_transaction_preview(
     write_enabled: bool,
     on_write_success,
 ) -> None:
-    render_section_header("Preview", "Controle")
+    render_section_header("Controle", "Opslaan")
     errors = validate_transaction(payload)
     row = build_transaction_row(payload)
     row_key = tuple(row[column] for column in TRANSACTION_COLUMNS)
@@ -171,7 +179,9 @@ def _render_transaction_preview(
                 st.caption(error)
             return
 
-        st.dataframe(pd.DataFrame([row], columns=TRANSACTION_COLUMNS), hide_index=True, width="stretch")
+        _render_row_preview(row)
+        with st.expander("Exacte rij-preview"):
+            st.dataframe(pd.DataFrame([row], columns=TRANSACTION_COLUMNS), hide_index=True, width="stretch")
         if not write_enabled:
             st.info("Opslaan is alleen beschikbaar met Live Google Sheets data.")
 
@@ -186,7 +196,7 @@ def _render_transaction_preview(
             or already_saved
             or st.session_state.get("tx_save_in_progress", False)
         )
-        if st.button("Transactie opslaan", disabled=disabled, key="tx_save_button"):
+        if st.button("Transactie opslaan", disabled=disabled, key="tx_save_button", type="primary"):
             _save_transaction(row, row_key, on_write_success)
 
 
@@ -214,7 +224,6 @@ def _save_transaction(
     if on_write_success:
         on_write_success()
     st.success("Transactie opgeslagen in Google Sheets.")
-    st.dataframe(pd.DataFrame([row], columns=TRANSACTION_COLUMNS), hide_index=True, width="stretch")
 
 
 def _render_recent_transactions(transactions: pd.DataFrame, write_enabled: bool) -> None:
@@ -222,23 +231,19 @@ def _render_recent_transactions(transactions: pd.DataFrame, write_enabled: bool)
     with st.container(border=True):
         if transactions.empty:
             if write_enabled:
-                st.info("Geen transacties gevonden in Google Sheets.")
+                render_empty_state("Geen transacties", "Er zijn nog geen transacties gevonden in Google Sheets.")
             else:
-                st.info("Recente transacties zijn alleen beschikbaar met Live Google Sheets data.")
+                render_empty_state("Geen live transacties", "Recente transacties zijn alleen beschikbaar met Live Google Sheets data.")
             return
 
         if not write_enabled:
             st.info("Mockdata preview. Er wordt niets naar Google Sheets geschreven of verwijderd.")
 
-        recent = _sort_transactions_newest_first(transactions).head(10)
-        recent_view = _prepare_recent_transactions_view(recent)
-        st.dataframe(
-            recent_view,
-            hide_index=True,
-            width="stretch",
-        )
+        recent = _sort_transactions_newest_first(transactions).head(10).reset_index(drop=True)
+        for index, row in recent.iterrows():
+            _render_recent_transaction_item(row, write_enabled, index)
         if write_enabled:
-            if st.button("Transactie verwijderen", type="secondary", key="tx_delete_panel_open"):
+            if st.button("Correctie verwijderen", type="secondary", key="tx_delete_panel_open"):
                 st.session_state["tx_show_delete_panel"] = True
 
 
@@ -274,6 +279,9 @@ def _render_delete_transaction(
             return
 
         ticker_options = sorted(safe_transactions["Ticker"].dropna().astype(str).unique())
+        prefill_ticker = st.session_state.get("tx_delete_prefill_ticker")
+        if prefill_ticker in ticker_options:
+            st.session_state["tx_delete_ticker_select"] = prefill_ticker
         ticker = st.selectbox("Ticker voor correctie", ticker_options, key="tx_delete_ticker_select")
         latest_for_ticker = (
             _sort_transactions_newest_first(
@@ -295,9 +303,16 @@ def _render_delete_transaction(
         )
 
         labels = [_delete_option_label(row) for _, row in latest_for_ticker.iterrows()]
+        prefill_row = int(st.session_state.get("tx_delete_prefill_row", 0) or 0)
+        default_index = 0
+        if prefill_row:
+            matches = latest_for_ticker.index[latest_for_ticker["Sheet rij"].astype(int) == prefill_row].tolist()
+            if matches:
+                default_index = int(matches[0])
         selected_label = st.radio(
             "Kies exact een transactie",
             labels,
+            index=default_index,
             key=f"tx_delete_selection_{_safe_key_part(ticker)}",
         )
         selected_index = labels.index(selected_label)
@@ -349,6 +364,44 @@ def _prepare_recent_transactions_view(transactions: pd.DataFrame) -> pd.DataFram
         for total, currency in zip(view["Totaal"], view["Valuta"])
     ]
     return view
+
+
+def _render_row_preview(row: dict[str, object]) -> None:
+    ticker = str(row.get("Ticker", ""))
+    amount = _parse_float(row.get("Aantal", 0))
+    total = _parse_float(row.get("Totaal", 0))
+    currency = str(row.get("Valuta", "EUR"))
+    total_label = format_currency_eur(total) if currency.upper() == "EUR" else f"{currency} {total:,.0f}"
+    detail = (
+        f"{row.get('Type', '')} · {row.get('Datum', '')} · "
+        f"{format_quantity_with_unit(amount, ticker)}"
+    )
+    render_transaction_item(ticker=ticker, detail=detail, amount=total_label)
+
+
+def _render_recent_transaction_item(row: pd.Series, write_enabled: bool, index: int) -> None:
+    sheet_row = int(row.get("Sheet rij", 0) or 0)
+    ticker = str(row.get("Ticker", ""))
+    amount = _parse_float(row.get("Aantal", 0))
+    total = _parse_float(row.get("Totaal", 0))
+    currency = str(row.get("Valuta", "EUR"))
+    total_label = format_currency_eur(total) if currency.upper() == "EUR" else f"{currency} {total:,.0f}"
+    detail = f"{row.get('Type', '')} · {row.get('Datum', '')} · {format_quantity_with_unit(amount, ticker)}"
+
+    item_col, action_col = st.columns([1, 0.16], gap="small")
+    with item_col:
+        render_transaction_item(ticker=ticker, detail=detail, amount=total_label)
+    with action_col:
+        if write_enabled and sheet_row >= 2:
+            if st.button(
+                "\U0001f5d1",
+                key=f"tx_recent_delete_{sheet_row}_{index}",
+                help="Transactie verwijderen",
+                type="secondary",
+            ):
+                st.session_state["tx_show_delete_panel"] = True
+                st.session_state["tx_delete_prefill_ticker"] = ticker
+                st.session_state["tx_delete_prefill_row"] = sheet_row
 
 
 def _sort_transactions_newest_first(transactions: pd.DataFrame) -> pd.DataFrame:

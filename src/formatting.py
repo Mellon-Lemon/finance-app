@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pandas as pd
+
 
 def format_currency(value: float, currency: str = "EUR", decimals: int = 0) -> str:
     value = _clean_zero(value, decimals)
@@ -14,7 +16,8 @@ def format_currency_eur(value: float, decimals: int = 0) -> str:
 
 
 def format_number(value: float, decimals: int = 2) -> str:
-    return f"{value:,.{decimals}f}"
+    formatted = f"{value:,.{decimals}f}"
+    return formatted.replace(",", "_").replace(".", ",").replace("_", ".")
 
 
 def format_percent(value: float, decimals: int = 1) -> str:
@@ -34,6 +37,10 @@ def format_profit(value: float, decimals: int = 0) -> str:
     return signed_currency(value, "EUR") if decimals == 0 else _signed_currency_decimals(value, decimals)
 
 
+def format_currency_delta(value: float, decimals: int = 0) -> str:
+    return format_profit(value, decimals)
+
+
 def format_quantity(value: float, ticker: str = "") -> str:
     decimals = 6 if ticker.upper() == "BTC" else 4
     rounded = round(float(value), decimals)
@@ -46,6 +53,13 @@ def format_quantity(value: float, ticker: str = "") -> str:
 def format_quantity_with_unit(value: float, ticker: str = "") -> str:
     quantity = format_quantity(value, ticker)
     return f"{quantity} BTC" if ticker.upper() == "BTC" else f"{quantity} stuks"
+
+
+def format_date_short(value: object) -> str:
+    parsed = pd.to_datetime(value, dayfirst=True, errors="coerce")
+    if pd.isna(parsed):
+        return str(value)
+    return parsed.strftime("%d-%m-%Y")
 
 
 def _clean_zero(value: float, decimals: int) -> float:

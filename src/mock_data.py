@@ -23,7 +23,7 @@ def load_mock_data() -> MockFinanceData:
         portfolio=_build_portfolio(),
         saldi=_build_saldi(),
         historie=_build_historie(),
-        dividend_total=166.51,
+        dividend_total=84.20,
         transactions=_build_transactions(),
     )
 
@@ -33,37 +33,37 @@ def _build_portfolio() -> pd.DataFrame:
         {
             "Categorie": "Crypto",
             "Ticker": "BTC",
-            "Aantal": 0.46499113,
-            "Inleg": 22000.0,
-            "Koers": 68036.56737280384,
+            "Aantal": 0.082345,
+            "Inleg": 4200.0,
+            "Koers": 70500.0,
+        },
+        {
+            "Categorie": "Crypto",
+            "Ticker": "ETH",
+            "Aantal": 1.75,
+            "Inleg": 3900.0,
+            "Koers": 3100.0,
         },
         {
             "Categorie": "Aandelen",
-            "Ticker": "GOOGL",
-            "Aantal": 24.0,
+            "Ticker": "VWRL",
+            "Aantal": 36.0,
             "Inleg": 3400.0,
-            "Koers": 172.35,
+            "Koers": 108.75,
         },
         {
             "Categorie": "Aandelen",
-            "Ticker": "AMZN",
+            "Ticker": "ASML",
+            "Aantal": 4.0,
+            "Inleg": 2300.0,
+            "Koers": 710.0,
+        },
+        {
+            "Categorie": "Aandelen",
+            "Ticker": "AAPL",
             "Aantal": 18.0,
-            "Inleg": 2900.0,
-            "Koers": 184.20,
-        },
-        {
-            "Categorie": "Aandelen",
-            "Ticker": "MSFT",
-            "Aantal": 12.0,
-            "Inleg": 4100.0,
-            "Koers": 421.30,
-        },
-        {
-            "Categorie": "Aandelen",
-            "Ticker": "TSWE",
-            "Aantal": 144.0,
-            "Inleg": 5200.0,
-            "Koers": 41.86,
+            "Inleg": 2800.0,
+            "Koers": 205.0,
         },
     ]
     portfolio = pd.DataFrame(rows)
@@ -78,9 +78,9 @@ def _build_portfolio() -> pd.DataFrame:
 def _build_saldi() -> pd.DataFrame:
     return pd.DataFrame(
         [
-            {"Account": "Spaar", "Huidig Saldo": 15000.0},
-            {"Account": "Vakanties", "Huidig Saldo": 3800.0},
-            {"Account": "Vrije ruimte", "Huidig Saldo": 3023.16},
+            {"Account": "Spaar", "Huidig Saldo": 5200.0},
+            {"Account": "Vakanties", "Huidig Saldo": 1800.0},
+            {"Account": "Vrije ruimte", "Huidig Saldo": 950.0},
         ]
     )
 
@@ -101,13 +101,13 @@ def _build_historie() -> pd.DataFrame:
             "2026-05-09",
         ]
     )
-    spaar = [9800, 10250, 10800, 11250, 11800, 12500, 13200, 13800, 14350, 14800, 15000]
-    vakanties = [2300, 2400, 2550, 2700, 2900, 3100, 3250, 3400, 3550, 3700, 3800]
-    vrije_ruimte = [1780, 1920, 2050, 2190, 2350, 2500, 2680, 2825, 2920, 2980, 3023.16]
-    crypto = [23800, 25150, 24300, 26750, 28100, 29550, 28900, 30150, 30900, 31420, 31636.40]
-    degiro = [14200, 14800, 15150, 15850, 16250, 16900, 17200, 17680, 18150, 18410, 18535.44]
-    crypto_inleg = [18500, 19000, 19500, 20000, 20500, 21200, 21600, 21800, 22000, 22000, 22000]
-    degiro_inleg = [12500, 12900, 13200, 13600, 14000, 14500, 14900, 15200, 15400, 15600, 15600]
+    spaar = [3600, 3725, 3900, 4100, 4325, 4550, 4700, 4875, 5000, 5100, 5200]
+    vakanties = [900, 960, 1025, 1100, 1180, 1260, 1360, 1480, 1600, 1700, 1800]
+    vrije_ruimte = [420, 455, 500, 540, 590, 630, 700, 760, 820, 890, 950]
+    crypto = [5600, 5900, 6250, 6800, 7350, 7900, 8400, 9050, 9800, 10550, 11230.32]
+    degiro = [7800, 8050, 8300, 8620, 8900, 9200, 9480, 9820, 10100, 10320, 10445.00]
+    crypto_inleg = [6200, 6500, 6800, 7000, 7200, 7500, 7700, 7900, 8100, 8100, 8100]
+    degiro_inleg = [6200, 6500, 6900, 7200, 7600, 8000, 8300, 8500, 8500, 8500, 8500]
 
     historie = pd.DataFrame(
         {
@@ -119,7 +119,7 @@ def _build_historie() -> pd.DataFrame:
             "Crypto I.": crypto_inleg,
             "DeGiro W.": degiro,
             "DeGiro I.": degiro_inleg,
-            "BTC Aant.": [0.36, 0.38, 0.39, 0.405, 0.42, 0.435, 0.445, 0.452, 0.458, 0.462, 0.46499113],
+            "BTC Aant.": [0.025, 0.03, 0.036, 0.044, 0.052, 0.061, 0.068, 0.074, 0.079, 0.081, 0.082345],
         }
     )
     historie["Belegd Vermogen"] = historie["Crypto W."] + historie["DeGiro W."]
@@ -150,11 +150,11 @@ def _build_historie() -> pd.DataFrame:
 
 def _build_transactions() -> pd.DataFrame:
     rows = [
-        {"Sheet rij": 11, "Datum": "08-05-2026", "Ticker": "BTC", "Type": "Buy", "Aantal": 0.02, "Totaal": 1250.0, "Valuta": "EUR"},
-        {"Sheet rij": 12, "Datum": "08-05-2026", "Ticker": "GOOGL", "Type": "Buy", "Aantal": 2.0, "Totaal": 345.0, "Valuta": "EUR"},
-        {"Sheet rij": 13, "Datum": "09-05-2026", "Ticker": "MSFT", "Type": "Dividend", "Aantal": 0.0, "Totaal": 22.5, "Valuta": "EUR"},
-        {"Sheet rij": 14, "Datum": "09-05-2026", "Ticker": "AMZN", "Type": "Buy", "Aantal": 1.0, "Totaal": 184.2, "Valuta": "EUR"},
-        {"Sheet rij": 15, "Datum": "10-05-2026", "Ticker": "BTC", "Type": "Buy", "Aantal": 0.01, "Totaal": 680.0, "Valuta": "EUR"},
+        {"Sheet rij": 11, "Datum": "06-05-2026", "Ticker": "VWRL", "Type": "Buy", "Aantal": 4.0, "Totaal": 435.0, "Valuta": "EUR"},
+        {"Sheet rij": 12, "Datum": "07-05-2026", "Ticker": "ETH", "Type": "Buy", "Aantal": 0.15, "Totaal": 465.0, "Valuta": "EUR"},
+        {"Sheet rij": 13, "Datum": "08-05-2026", "Ticker": "ASML", "Type": "Buy", "Aantal": 1.0, "Totaal": 710.0, "Valuta": "EUR"},
+        {"Sheet rij": 14, "Datum": "09-05-2026", "Ticker": "AAPL", "Type": "Dividend", "Aantal": 0.0, "Totaal": 14.2, "Valuta": "EUR"},
+        {"Sheet rij": 15, "Datum": "10-05-2026", "Ticker": "BTC", "Type": "Buy", "Aantal": 0.006, "Totaal": 423.0, "Valuta": "EUR"},
     ]
     return pd.DataFrame(
         rows,
