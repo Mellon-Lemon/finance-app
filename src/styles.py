@@ -96,6 +96,18 @@ def inject_global_styles() -> None:
                 color: #92400e;
             }
 
+            .fc-positive {
+                color: var(--fc-green-dark) !important;
+            }
+
+            .fc-negative {
+                color: var(--fc-red) !important;
+            }
+
+            .fc-neutral {
+                color: var(--fc-muted) !important;
+            }
+
             .fc-action-caption {
                 align-items: center;
                 display: flex;
@@ -273,6 +285,22 @@ def inject_global_styles() -> None:
             .fc-chip strong {
                 color: var(--fc-green-dark);
                 font-weight: 820;
+            }
+
+            .fc-chip--negative {
+                background: rgba(220, 38, 38, 0.07);
+            }
+
+            .fc-chip--negative strong {
+                color: var(--fc-red);
+            }
+
+            .fc-chip--neutral {
+                background: rgba(107, 114, 128, 0.08);
+            }
+
+            .fc-chip--neutral strong {
+                color: var(--fc-muted);
             }
 
             .fc-target-card {

@@ -34,6 +34,8 @@ Huidige status:
 - Write-back alleen voor `Transacties` en `Saldi`
 - Handmatige data opnieuw laden leest Google Sheets opnieuw
 - Optionele Apps Script Web App refresh voor `refreshPortfolioOnly()`
+- Handmatige snapshot via Apps Script `manualPortfolioSnapshot()` is beschikbaar na expliciete bevestiging
+- Dashboard toont compacte BTC/TSWE koerscards met 24u, 7d, 30d en YTD performance uit `Historie`
 - Transacties kunnen achter elkaar worden toegevoegd
 - Recente transacties worden getoond in de Transactie-tab
 - Veilige delete van maximaal de laatste 3 transacties per ticker is beschikbaar in Live mode
@@ -41,16 +43,16 @@ Huidige status:
 - Portfolio holdings hebben een compacte mobielvriendelijke weergave
 - Handmatige `Live Google Sheets` / `Demo / Mockdata` datamodus is beschikbaar
 - Delete-flow gebruikt unieke widget keys om duplicate element IDs te voorkomen
-- Mobile-first UX-refactor actief: compacte app-shell, actiebar, icon-navigatie en herbruikbare card-componenten
+- Mobile-first UX-refactor actief: compacte app-shell, `Beheer`-sectie, icon-navigatie en herbruikbare card-componenten
 
 Niet gebouwd:
 
 - write-back naar `Portfolio`
-- write-back naar `Historie`
+- directe write-back naar `Historie` vanuit Python
 - write-back naar `Instellingen`
 - automatische koersdata ophalen
 - `dailyPortfolioSnapshot()` vanuit Streamlit
-- Historie snapshots schrijven vanuit Streamlit
+- Historie snapshots rechtstreeks schrijven vanuit Python
 - e-mail versturen vanuit Streamlit
 - deploy
 
@@ -83,16 +85,17 @@ De gekozen datamodus blijft in `session_state` staan tijdens reruns.
 In `Demo / Mockdata`:
 
 - `load_finance_data(force_mock=True)` laadt direct mockdata
-- mockdata bestaat uit fictieve holdings, saldi, historie, dividend en transacties
+- mockdata bestaat uit fictieve holdings, saldi, historie, dividend, transacties en koerswaarden
 - er wordt geen Google Sheets call gedaan
 - er wordt geen Apps Script call gedaan
 - er wordt niets naar Google Sheets geschreven
 - er wordt niets uit Google Sheets verwijderd
 - write/delete knoppen zijn uitgeschakeld of verborgen
 - `Portfolio bijwerken` toont een veilige melding en triggert niets
+- `Snapshot maken` is niet beschikbaar en triggert niets
 - de UI toont expliciet `Demo / Mockdata`
 
-Write-back, delete en `Portfolio bijwerken` zijn alleen actief in echte `Live Google Sheets` mode.
+Write-back, delete, `Portfolio bijwerken` en `Snapshot maken` zijn alleen actief in echte `Live Google Sheets` mode.
 
 In `Demo / Mockdata` en `Fallback actief`:
 
@@ -100,6 +103,7 @@ In `Demo / Mockdata` en `Fallback actief`:
 - opslaan is niet beschikbaar
 - er wordt nooit naar Google Sheets geschreven
 - er wordt nooit uit Google Sheets verwijderd
+- er wordt nooit een Apps Script actie aangeroepen
 
 ## Data Opnieuw Laden
 
@@ -142,6 +146,7 @@ De app kan optioneel een Apps Script Web App endpoint aanroepen met de knop `Por
 
 Doel:
 
+- Apps Script action `refresh` uitvoeren
 - Apps Script `refreshPortfolioOnly()` uitvoeren
 - het `Portfolio` tabblad laten bijwerken door de bestaande Apps Script engine
 - daarna Streamlit cache legen en Google Sheets opnieuw lezen
@@ -163,7 +168,39 @@ Na succesvolle write-back naar `Transacties` of `Saldi`:
 - als de Apps Script endpoint-configuratie aanwezig is, roept de app automatisch `refreshPortfolioOnly()` aan en leest daarna Google Sheets opnieuw
 - als de configuratie ontbreekt, blijft de write-back geslaagd en toont de app dat Portfolio bijwerken nog niet geconfigureerd is
 
-De dagelijkse snapshot blijft apart in Apps Script via de 22:00 trigger. Streamlit roept die snapshot niet aan. Historie-snapshots en eventuele e-mailnotificaties blijven bij `dailyPortfolioSnapshot()`.
+## Handmatige Snapshot
+
+De app kan optioneel hetzelfde Apps Script Web App endpoint aanroepen met de knop `Snapshot maken`.
+
+Doel:
+
+- Apps Script action `manual_snapshot` uitvoeren
+- Apps Script `manualPortfolioSnapshot()` uitvoeren
+- het `Portfolio` tabblad laten bijwerken door de bestaande Apps Script engine
+- precies een nieuwe `Historie`-regel laten schrijven door Apps Script
+- daarna Streamlit cache legen en Google Sheets opnieuw lezen
+
+`Snapshot maken` doet niet:
+
+- `dailyPortfolioSnapshot()` aanroepen
+- e-mail versturen
+- rechtstreeks naar `Historie` schrijven vanuit Python
+- rechtstreeks naar `Portfolio` schrijven vanuit Python
+- Google Finance of portfolioformules vervangen
+
+De flow vereist expliciete bevestiging:
+
+1. Gebruiker klikt `Snapshot maken` in `Beheer`.
+2. De app toont dat dit een nieuwe regel naar `Historie` schrijft maar geen e-mail verstuurt.
+3. De app toont dat meerdere snapshots per dag zijn toegestaan maar historische grafieken beinvloeden.
+4. Gebruiker vinkt `Ik bevestig dat ik handmatig een Historie-snapshot wil maken.` aan.
+5. Gebruiker klikt `Snapshot definitief maken`.
+6. Pas daarna roept Streamlit Apps Script aan met `action="manual_snapshot"`.
+7. Na succes toont de app `Snapshot gemaakt` en laadt data opnieuw.
+
+De actie is alleen beschikbaar in echte `Live Google Sheets` mode en alleen als de Apps Script configuratie aanwezig is. In `Demo / Mockdata` en `Fallback actief` wordt geen Apps Script call gedaan en wordt nooit naar `Historie` geschreven.
+
+Meerdere handmatige snapshots per dag zijn toegestaan, maar alleen na deze bevestiging. De dagelijkse snapshot blijft apart in Apps Script via de 22:00 trigger. Streamlit roept `dailyPortfolioSnapshot()` niet aan. E-mailnotificaties blijven alleen bij de dagelijkse Apps Script trigger.
 
 ## Configuratie
 
@@ -185,7 +222,7 @@ APPS_SCRIPT_REFRESH_URL=https://script.google.com/macros/s/.../exec
 APPS_SCRIPT_REFRESH_SECRET=...
 ```
 
-`APPS_SCRIPT_REFRESH_URL` en `APPS_SCRIPT_REFRESH_SECRET` zijn alleen nodig voor `Portfolio bijwerken`. De secret wordt via de JSON body naar het Web App endpoint gestuurd en mag niet hardcoded, gelogd of volledig in de UI getoond worden.
+`APPS_SCRIPT_REFRESH_URL` en `APPS_SCRIPT_REFRESH_SECRET` zijn alleen nodig voor `Portfolio bijwerken` en `Snapshot maken`. De secret wordt via de JSON body naar het Web App endpoint gestuurd en mag niet hardcoded, gelogd of volledig in de UI getoond worden.
 
 De Google Sheet moet met editorrechten gedeeld worden met het `client_email` adres uit het service-account JSON-bestand.
 
@@ -232,6 +269,20 @@ De app bevat een compacte button-based icon-navigatie met vier hoofdsecties. De 
 3. Transactie
 4. Saldi
 
+## Beheer
+
+Alle beheeracties staan in een compacte expander `Beheer`.
+
+Beheer bevat:
+
+- Datamodus `Live Google Sheets` / `Demo / Mockdata`
+- `Data opnieuw laden`
+- `Portfolio bijwerken`
+- `Snapshot maken`
+- het bevestigingspaneel voor `Snapshot definitief maken`
+
+Buiten `Beheer` staan geen losse beheerknoppen. De header toont alleen titel, subtitel en statusbadge; daaronder staat de navigatie.
+
 ## Dashboard
 
 Dashboard is een clean cockpit-overzicht.
@@ -240,6 +291,7 @@ Het dashboard bevat:
 
 - een primaire card voor totaal vermogen
 - compacte KPI-cards
+- compacte koersperformancecards voor BTC en TSWE
 - target progress cards
 
 Het dashboard bevat geen grote grafieken, detailtabellen, recente activiteit of correctiefunctionaliteit. Analysevisuals staan op Portfolio.
@@ -247,10 +299,21 @@ Het dashboard bevat geen grote grafieken, detailtabellen, recente activiteit of 
 KPI's:
 
 - Totaal vermogen: waarde, geen performance badges
-- Totaal belegd vermogen: waarde, winst/verlies, 24u, 30d, YTD
-- Crypto: waarde, winst/verlies, 24u, 30d, YTD
-- Aandelen: waarde, winst/verlies, 24u, 30d, YTD
+- Totaal belegd vermogen: waarde, winst/verlies, 24u, 7d, 30d, YTD
+- Crypto: waarde, winst/verlies, 24u, 7d, 30d, YTD
+- Aandelen: waarde, winst/verlies, 24u, 7d, 30d, YTD
 - Dividend totaal: waarde, geen performance badges
+
+Koerscards:
+
+- Bitcoin koers: huidige koers uit `Portfolio` ticker `BTC`, kolom `Koers`
+- TSWE koers: huidige koers uit `Portfolio` ticker `TSWE`, kolom `Koers`
+- BTC performance: uit `Historie`, kolom `BTC Koers`
+- TSWE performance: uit `Historie`, kolom `TSWE Koers`
+- perioden: 24u, 7d, 30d, YTD
+- geen externe koers API
+- geen nieuwe Google Sheets tabs
+- demo mode toont fictieve koerswaarden
 
 Performance wordt berekend uit `Historie`.
 
@@ -482,9 +545,10 @@ Verwijderd uit tabs:
 
 - `Transacties`, maximaal een bestaande rij tegelijk via veilige correctieflow
 
-Indirect bijgewerkt door Apps Script via `refreshPortfolioOnly()`:
+Indirect bijgewerkt door Apps Script:
 
-- `Portfolio`
+- `Portfolio` via `refreshPortfolioOnly()` en `manualPortfolioSnapshot()`
+- `Historie` via `manualPortfolioSnapshot()` en de bestaande dagelijkse Apps Script trigger
 
 Niet rechtstreeks geschreven door Streamlit:
 
@@ -505,6 +569,11 @@ Kolommen:
 - Waarde (EUR)
 - Winst (EUR)
 - ROI %
+
+Koerscards lezen:
+
+- BTC koers uit ticker `BTC`, kolom `Koers (EUR)`
+- TSWE koers uit ticker `TSWE`, kolom `Koers (EUR)`
 
 ### Saldi
 
@@ -535,6 +604,10 @@ Kolommen:
 - DeGiro I.
 - BTC Aant.
 - Inleg Tot.
+- BTC Koers
+- TSWE Koers
+
+Oudere rijen mogen `BTC Koers` en `TSWE Koers` missen of leeg laten. De parser vult deze niet kunstmatig met 0 voor performance, maar slaat ongeldige koerspunten over.
 
 ### Transacties
 
@@ -576,8 +649,8 @@ Regels:
 
 Niet bouwen:
 
-- schrijven naar `Portfolio`
-- schrijven naar `Historie`
+- rechtstreeks schrijven naar `Portfolio` vanuit Python
+- rechtstreeks schrijven naar `Historie` vanuit Python
 - schrijven naar `Instellingen`
 - bestaande transacties updaten
 - bulk delete van transacties
@@ -585,9 +658,9 @@ Niet bouwen:
 - saldi-rijen toevoegen of verwijderen
 - Apps Script vervangen
 - Apps Script `dailyPortfolioSnapshot()` vanuit Streamlit
+- e-mail versturen vanuit Streamlit
 - `Data opnieuw laden` die Apps Script triggert
 - refresh die `Historie` schrijft
-- e-mailnotificaties
 - Google Finance vervangen
 - ROI-engine herbouwen
 - automatische snapshots maken
@@ -634,5 +707,8 @@ finance-app/
 - grote touch targets
 - rustige spacing
 - duidelijke card hierarchy
+- positieve performance is groen
+- negatieve performance is rood
+- neutrale of ontbrekende performance is gedempt/grijs
 
 Dashboard blijft cockpit. Portfolio bevat details en analyse. Transactie en Saldi gebruiken preview + bevestiging voordat write-back plaatsvindt.

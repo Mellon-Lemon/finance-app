@@ -12,6 +12,7 @@ class MockFinanceData:
     historie: pd.DataFrame
     dividend_total: float
     transactions: pd.DataFrame = field(default_factory=pd.DataFrame)
+    price_quotes: dict[str, object] = field(default_factory=dict)
     source_label: str = "Mockdata"
     source_message: str = "Lokale fallback"
     source_warning: str = ""
@@ -19,12 +20,15 @@ class MockFinanceData:
 
 
 def load_mock_data() -> MockFinanceData:
+    portfolio = _build_portfolio()
+    historie = _build_historie()
     return MockFinanceData(
-        portfolio=_build_portfolio(),
+        portfolio=portfolio,
         saldi=_build_saldi(),
-        historie=_build_historie(),
+        historie=historie,
         dividend_total=84.20,
         transactions=_build_transactions(),
+        price_quotes=_build_price_quotes(portfolio, historie),
     )
 
 
@@ -46,10 +50,10 @@ def _build_portfolio() -> pd.DataFrame:
         },
         {
             "Categorie": "Aandelen",
-            "Ticker": "VWRL",
-            "Aantal": 36.0,
-            "Inleg": 3400.0,
-            "Koers": 108.75,
+            "Ticker": "TSWE",
+            "Aantal": 86.0,
+            "Inleg": 3300.0,
+            "Koers": 40.0,
         },
         {
             "Categorie": "Aandelen",
@@ -85,6 +89,27 @@ def _build_saldi() -> pd.DataFrame:
     )
 
 
+def _build_price_quotes(portfolio: pd.DataFrame, historie: pd.DataFrame) -> dict[str, dict[str, object]]:
+    quotes: dict[str, float] = {}
+    for ticker in ("BTC", "TSWE"):
+        rows = portfolio.loc[portfolio["Ticker"].astype(str).str.upper() == ticker]
+        quotes[ticker] = float(rows["Koers"].iloc[0]) if not rows.empty else 0.0
+    return {
+        "BTC": {
+            "ticker": "BTC",
+            "label": "Bitcoin",
+            "price": quotes["BTC"],
+            "performance": _build_demo_performance(historie, "BTC Koers"),
+        },
+        "TSWE": {
+            "ticker": "TSWE",
+            "label": "TSWE",
+            "price": quotes["TSWE"],
+            "performance": _build_demo_performance(historie, "TSWE Koers"),
+        },
+    }
+
+
 def _build_historie() -> pd.DataFrame:
     dates = pd.to_datetime(
         [
@@ -108,6 +133,8 @@ def _build_historie() -> pd.DataFrame:
     degiro = [7800, 8050, 8300, 8620, 8900, 9200, 9480, 9820, 10100, 10320, 10445.00]
     crypto_inleg = [6200, 6500, 6800, 7000, 7200, 7500, 7700, 7900, 8100, 8100, 8100]
     degiro_inleg = [6200, 6500, 6900, 7200, 7600, 8000, 8300, 8500, 8500, 8500, 8500]
+    btc_koers = [46000, 48500, 51000, 54800, 58400, 62000, 64200, 66800, 69000, 68200, 70500]
+    tswe_koers = [31.8, 32.6, 33.4, 34.9, 36.1, 37.0, 37.6, 38.4, 39.1, 39.6, 40.0]
 
     historie = pd.DataFrame(
         {
@@ -120,6 +147,8 @@ def _build_historie() -> pd.DataFrame:
             "DeGiro W.": degiro,
             "DeGiro I.": degiro_inleg,
             "BTC Aant.": [0.025, 0.03, 0.036, 0.044, 0.052, 0.061, 0.068, 0.074, 0.079, 0.081, 0.082345],
+            "BTC Koers": btc_koers,
+            "TSWE Koers": tswe_koers,
         }
     )
     historie["Belegd Vermogen"] = historie["Crypto W."] + historie["DeGiro W."]
@@ -144,8 +173,35 @@ def _build_historie() -> pd.DataFrame:
             "DeGiro I.",
             "BTC Aant.",
             "Inleg Tot.",
+            "BTC Koers",
+            "TSWE Koers",
         ]
     ]
+
+
+def _build_demo_performance(historie: pd.DataFrame, column: str) -> dict[str, dict[str, object]]:
+    latest = float(historie[column].iloc[-1])
+    periods = {
+        "24u": float(historie[column].iloc[-2]),
+        "7d": float(historie[column].iloc[-2]),
+        "30d": float(historie[column].iloc[-2]),
+        "YTD": float(historie.loc[historie["Datum"] <= pd.Timestamp("2026-01-31"), column].iloc[-1]),
+    }
+    return {
+        label: _demo_performance_entry(latest, reference)
+        for label, reference in periods.items()
+    }
+
+
+def _demo_performance_entry(current: float, reference: float) -> dict[str, object]:
+    if reference == 0:
+        return {"delta": None, "percentage": None, "tone": "neutral"}
+    delta = current - reference
+    return {
+        "delta": delta,
+        "percentage": (delta / reference) * 100,
+        "tone": "positive" if delta > 0 else "negative" if delta < 0 else "neutral",
+    }
 
 
 def _build_transactions() -> pd.DataFrame:

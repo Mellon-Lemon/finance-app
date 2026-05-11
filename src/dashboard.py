@@ -24,12 +24,14 @@ def render_dashboard(
     saldi: pd.DataFrame,
     historie: pd.DataFrame,
     dividend_total: float,
+    price_quotes: dict[str, object],
 ) -> None:
     metrics = _calculate_metrics(portfolio, saldi, dividend_total)
     performance = _calculate_performance_metrics(metrics, historie)
 
     render_section_header("Vandaag", "Cockpit")
     _render_kpis(metrics, performance)
+    _render_price_quotes(price_quotes)
 
     render_section_header("Doelen", "Voortgang")
     _render_targets(metrics, historie)
@@ -131,6 +133,40 @@ def _render_kpis(
     render_metric_grid(performance_cards, columns=2)
 
 
+def _render_price_quotes(price_quotes: dict[str, object]) -> None:
+    cards = [
+        _build_price_quote_card(price_quotes.get("BTC", {}), decimals=0),
+        _build_price_quote_card(price_quotes.get("TSWE", {}), decimals=2),
+    ]
+    render_metric_grid(cards, columns=2)
+
+
+def _build_price_quote_card(quote: object, decimals: int) -> MetricCard:
+    quote_data = quote if isinstance(quote, dict) else {"price": quote}
+    label = str(quote_data.get("label") or quote_data.get("ticker") or "Koers")
+    price = _safe_float(quote_data.get("price"))
+    performance = quote_data.get("performance") if isinstance(quote_data.get("performance"), dict) else {}
+    return MetricCard(
+        label if label.endswith("koers") else f"{label} koers",
+        format_currency(price, decimals=decimals),
+        "",
+        None,
+        tuple(
+            _price_performance_metric(period, performance.get(period))
+            for period in ("24u", "7d", "30d", "YTD")
+        ),
+        "performance",
+    )
+
+
+def _price_performance_metric(label: str, entry: object) -> PerformanceMetric:
+    if not isinstance(entry, dict) or entry.get("percentage") is None:
+        return PerformanceMetric(label, "n.v.t.", "neutral")
+    percentage = _safe_float(entry.get("percentage"))
+    tone = str(entry.get("tone") or _value_tone(percentage))
+    return PerformanceMetric(label, _signed_percent(percentage), tone)
+
+
 def _calculate_performance_metrics(
     metrics: dict[str, float],
     historie: pd.DataFrame,
@@ -144,6 +180,7 @@ def _calculate_performance_metrics(
     return {
         key: (
             _build_performance_from_history("24u", historie, column, days_back=1),
+            _build_performance_from_history("7d", historie, column, days_back=7),
             _build_performance_from_history("30d", historie, column, days_back=30),
             _build_performance_from_history("YTD", historie, column, reference_date=YTD_START_DATE),
         )
@@ -170,8 +207,8 @@ def _build_performance_from_history(
 
     delta = latest_value - reference_value
     percentage = delta / reference_value * 100 if reference_value else 0.0
-    value = f"{signed_currency(delta)} · {format_percent(percentage, 1)}"
-    return PerformanceMetric(label, value)
+    value = f"{signed_currency(delta)} / {_signed_percent(percentage)}"
+    return PerformanceMetric(label, value, _value_tone(delta))
 
 
 def _get_latest_history_point(
@@ -199,6 +236,28 @@ def _get_history_value_on_or_before(
     if earlier_snapshots.empty:
         return None
     return float(earlier_snapshots[column].iloc[-1])
+
+
+def _signed_percent(value: float) -> str:
+    if value > 0:
+        return f"+{format_percent(value, 1)}"
+    return format_percent(value, 1)
+
+
+def _value_tone(value: float) -> str:
+    if value > 0:
+        return "positive"
+    if value < 0:
+        return "negative"
+    return "neutral"
+
+
+def _safe_float(value: object) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return 0.0 if pd.isna(parsed) else parsed
 
 
 def _render_targets(metrics: dict[str, float], historie: pd.DataFrame) -> None:

@@ -1,6 +1,7 @@
 import streamlit as st
 
 from src.apps_script_client import (
+    create_manual_snapshot_via_apps_script,
     is_apps_script_refresh_configured,
     refresh_portfolio_via_apps_script,
 )
@@ -105,6 +106,81 @@ def update_portfolio_and_reload(source_label: str, data_mode: str) -> None:
         st.error(result.message)
 
 
+def request_manual_snapshot(source_label: str, data_mode: str) -> None:
+    if data_mode == "demo":
+        st.info("Snapshot maken is alleen beschikbaar in Live Google Sheets mode.")
+        return
+
+    if source_label != "Live Google Sheets":
+        st.info("Snapshot maken is alleen beschikbaar in Live Google Sheets mode.")
+        return
+
+    if not is_apps_script_refresh_configured():
+        st.info("Snapshot maken is nog niet geconfigureerd.")
+        return
+
+    st.session_state["show_manual_snapshot_confirmation"] = True
+
+
+def render_manual_snapshot_confirmation(source_label: str, data_mode: str) -> None:
+    if not st.session_state.get("show_manual_snapshot_confirmation", False):
+        return
+
+    with st.container(border=True):
+        st.warning("Dit schrijft een nieuwe regel naar Historie, maar verstuurt geen e-mail.")
+        st.caption(
+            "Meerdere snapshots per dag zijn toegestaan, maar beinvloeden je historische grafieken."
+        )
+
+        if data_mode != "live" or source_label != "Live Google Sheets":
+            st.info("Snapshot maken is alleen beschikbaar in Live Google Sheets mode.")
+            return
+
+        if not is_apps_script_refresh_configured():
+            st.info("Snapshot maken is nog niet geconfigureerd.")
+            return
+
+        confirmed = st.checkbox(
+            "Ik bevestig dat ik handmatig een Historie-snapshot wil maken.",
+            key="manual_snapshot_confirmed",
+        )
+        action_col, cancel_col = st.columns([1, 1], gap="small")
+        with action_col:
+            if st.button(
+                "Snapshot definitief maken",
+                type="primary",
+                key="manual_snapshot_confirm_button",
+                disabled=not confirmed or st.session_state.get("manual_snapshot_in_progress", False),
+            ):
+                create_manual_snapshot_and_reload()
+        with cancel_col:
+            if st.button("Annuleren", type="secondary", key="manual_snapshot_cancel_button"):
+                st.session_state["show_manual_snapshot_confirmation"] = False
+                st.session_state["manual_snapshot_confirmed"] = False
+                st.rerun()
+
+
+def create_manual_snapshot_and_reload() -> None:
+    try:
+        st.session_state["manual_snapshot_in_progress"] = True
+        with st.spinner("Snapshot maken..."):
+            result = create_manual_snapshot_via_apps_script()
+    except Exception:
+        st.error("Snapshot maken is mislukt. Controleer de Apps Script configuratie en probeer opnieuw.")
+        return
+    finally:
+        st.session_state["manual_snapshot_in_progress"] = False
+
+    if not result.ok:
+        st.error(result.message)
+        return
+
+    st.session_state["show_manual_snapshot_confirmation"] = False
+    st.session_state["manual_snapshot_confirmed"] = False
+    timestamp = f" Tijdstip: {result.timestamp}." if result.timestamp else ""
+    refresh_data(f"Snapshot gemaakt.{timestamp} Data opnieuw geladen.")
+
+
 def handle_write_success(action_message: str) -> None:
     if not is_apps_script_refresh_configured():
         refresh_data(
@@ -161,14 +237,33 @@ def main() -> None:
         source_label=data.source_label,
         on_reload=lambda: refresh_data("Data opnieuw geladen."),
         on_refresh=lambda: update_portfolio_and_reload(data.source_label, get_current_data_mode()),
+        on_snapshot_request=lambda: request_manual_snapshot(
+            data.source_label,
+            get_current_data_mode(),
+        ),
+        render_snapshot_confirmation=lambda: render_manual_snapshot_confirmation(
+            data.source_label,
+            get_current_data_mode(),
+        ),
         refresh_disabled=data_mode != "live" or data.source_label != "Live Google Sheets",
+        snapshot_disabled=(
+            data_mode != "live"
+            or data.source_label != "Live Google Sheets"
+            or not is_apps_script_refresh_configured()
+        ),
     )
     write_enabled = data_mode == "live" and data.source_label == "Live Google Sheets"
 
     active_tab = render_navigation()
 
     if active_tab == "Dashboard":
-        render_dashboard(data.portfolio, data.saldi, data.historie, data.dividend_total)
+        render_dashboard(
+            data.portfolio,
+            data.saldi,
+            data.historie,
+            data.dividend_total,
+            data.price_quotes,
+        )
 
     elif active_tab == "Portfolio":
         render_portfolio_table(data.portfolio, data.historie)

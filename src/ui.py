@@ -11,6 +11,7 @@ import streamlit as st
 class PerformanceMetric:
     label: str
     value: str
+    tone: str = "neutral"
 
 
 @dataclass(frozen=True)
@@ -53,19 +54,23 @@ def render_action_bar(
     source_label: str,
     on_reload: Callable[[], None],
     on_refresh: Callable[[], None],
+    on_snapshot_request: Callable[[], None],
+    render_snapshot_confirmation: Callable[[], None] | None = None,
     refresh_disabled: bool,
+    snapshot_disabled: bool,
 ) -> str:
-    with st.container(border=True):
+    with st.expander("Beheer"):
         st.markdown(
             (
                 '<div class="fc-action-caption">'
                 f'{_status_pill_html(source_label)}'
-                '<span>Data opnieuw laden leest alleen opnieuw. Portfolio bijwerken draait refreshPortfolioOnly().</span>'
+                '<span>Data opnieuw laden leest alleen. Portfolio bijwerken draait refreshPortfolioOnly(). Snapshot maken schrijft Historie via Apps Script zonder e-mail.</span>'
                 '</div>'
             ),
             unsafe_allow_html=True,
         )
-        mode_col, reload_col, refresh_col = st.columns([1.45, 0.82, 0.9], gap="small")
+        selected_mode = st.session_state.get("data_mode", "live")
+        mode_col, reload_col = st.columns([1.45, 0.9], gap="small")
         with mode_col:
             selected_mode = st.radio(
                 "Datamodus",
@@ -77,6 +82,8 @@ def render_action_bar(
         with reload_col:
             if st.button("Data opnieuw laden", type="secondary", key="reload_data_button"):
                 on_reload()
+
+        refresh_col, snapshot_col = st.columns(2, gap="small")
         with refresh_col:
             if st.button(
                 "Portfolio bijwerken",
@@ -85,6 +92,20 @@ def render_action_bar(
                 disabled=refresh_disabled,
             ):
                 on_refresh()
+        with snapshot_col:
+            if selected_mode == "demo" or source_label != "Live Google Sheets":
+                st.caption("Snapshot maken is alleen beschikbaar in Live Google Sheets mode.")
+            elif st.button(
+                "Snapshot maken",
+                type="secondary",
+                key="manual_snapshot_request_button",
+                disabled=snapshot_disabled,
+                help="Beschikbaar zodra het Apps Script endpoint is geconfigureerd.",
+            ):
+                on_snapshot_request()
+
+        if render_snapshot_confirmation is not None:
+            render_snapshot_confirmation()
 
         if selected_mode == "demo":
             st.caption("Demo / Mockdata gebruikt alleen fictieve data en schrijft nooit naar Google Sheets.")
@@ -132,7 +153,7 @@ def render_metric_card(card: MetricCard) -> None:
     tone = _delta_tone(card.delta or "")
     performance = "".join(
         (
-            '<div class="fc-chip">'
+            f'<div class="fc-chip fc-chip--{_metric_tone(metric)}">'
             f'<span>{escape(metric.label)}</span>'
             f'<strong>{escape(metric.value)}</strong>'
             '</div>'
@@ -230,7 +251,7 @@ def render_holding_card(
             f'<span>Inleg</span><strong>{escape(invested)}</strong>'
             f'<span>Waarde</span><strong>{escape(value)}</strong>'
             f'<span>Winst</span><strong class="fc-holding-profit--{tone}">{escape(profit)}</strong>'
-            f'<span>ROI</span><strong>{escape(roi)}</strong>'
+            f'<span>ROI</span><strong class="fc-holding-profit--{tone}">{escape(roi)}</strong>'
             '</div>'
             '</div>'
         ),
@@ -307,6 +328,12 @@ def _delta_tone(value: str) -> str:
     if value.startswith("-"):
         return "negative"
     return "neutral"
+
+
+def _metric_tone(metric: PerformanceMetric) -> str:
+    if metric.tone in {"positive", "negative", "neutral"}:
+        return metric.tone
+    return _delta_tone(metric.value)
 
 
 def _value_tone(value: float) -> str:

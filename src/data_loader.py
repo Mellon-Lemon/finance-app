@@ -43,8 +43,24 @@ HISTORIE_COLUMNS = [
     "DeGiro I.",
     "BTC Aant.",
     "Inleg Tot.",
+    "BTC Koers",
+    "TSWE Koers",
 ]
 TRANSACTION_VIEW_COLUMNS = ["Sheet rij", "Datum", "Ticker", "Type", "Aantal", "Totaal", "Valuta"]
+PRICE_QUOTE_TICKERS = ("BTC", "TSWE")
+PRICE_QUOTE_LABELS = {
+    "BTC": "Bitcoin",
+    "TSWE": "TSWE",
+}
+PRICE_HISTORY_COLUMNS = {
+    "BTC": "BTC Koers",
+    "TSWE": "TSWE Koers",
+}
+PRICE_PERFORMANCE_PERIODS = {
+    "24u": 1,
+    "7d": 7,
+    "30d": 30,
+}
 
 
 def load_finance_data(force_mock: bool = False) -> MockFinanceData:
@@ -104,6 +120,7 @@ def load_google_sheets_data(client: GoogleSheetsClient) -> MockFinanceData:
         historie=historie,
         dividend_total=dividend_total,
         transactions=parse_transaction_sheet(transactions),
+        price_quotes=build_price_quotes(portfolio, historie),
     )
 
 
@@ -127,6 +144,11 @@ def ensure_finance_data_contract(
         else getattr(data, "source_warning", ""),
         "google_debug": google_debug if google_debug is not None else getattr(data, "google_debug", {}),
         "transactions": getattr(data, "transactions", pd.DataFrame(columns=TRANSACTION_VIEW_COLUMNS)),
+        "price_quotes": _normalise_price_quotes(
+            getattr(data, "price_quotes", None),
+            data.portfolio,
+            data.historie,
+        ),
     }
     try:
         return replace(data, **values)
@@ -138,6 +160,149 @@ def ensure_finance_data_contract(
             dividend_total=data.dividend_total,
             **values,
         )
+
+
+def extract_price_quotes(portfolio: pd.DataFrame) -> dict[str, float]:
+    return {ticker: float(quote["price"]) for ticker, quote in build_price_quotes(portfolio).items()}
+
+
+def build_price_quotes(
+    portfolio: pd.DataFrame,
+    historie: pd.DataFrame | None = None,
+) -> dict[str, dict[str, object]]:
+    current_prices = _extract_current_prices(portfolio)
+    return {
+        ticker: {
+            "ticker": ticker,
+            "label": PRICE_QUOTE_LABELS[ticker],
+            "price": current_prices[ticker],
+            "performance": _build_price_performance(historie, PRICE_HISTORY_COLUMNS[ticker]),
+        }
+        for ticker in PRICE_QUOTE_TICKERS
+    }
+
+
+def _extract_current_prices(portfolio: pd.DataFrame) -> dict[str, float]:
+    if portfolio.empty or "Ticker" not in portfolio.columns or "Koers" not in portfolio.columns:
+        return {ticker: 0.0 for ticker in PRICE_QUOTE_TICKERS}
+
+    quotes: dict[str, float] = {}
+    tickers = portfolio["Ticker"].astype(str).str.upper()
+    for ticker in PRICE_QUOTE_TICKERS:
+        rows = portfolio.loc[tickers == ticker]
+        quotes[ticker] = float(rows["Koers"].iloc[0]) if not rows.empty else 0.0
+    return quotes
+
+
+def _normalise_price_quotes(
+    price_quotes: object,
+    portfolio: pd.DataFrame,
+    historie: pd.DataFrame,
+) -> dict[str, dict[str, object]]:
+    if not isinstance(price_quotes, dict):
+        return build_price_quotes(portfolio, historie)
+
+    normalised = build_price_quotes(portfolio, historie)
+    for ticker in PRICE_QUOTE_TICKERS:
+        quote = price_quotes.get(ticker)
+        if isinstance(quote, int | float):
+            normalised[ticker]["price"] = float(quote)
+        elif isinstance(quote, dict):
+            normalised[ticker] = {
+                **normalised[ticker],
+                **quote,
+                "performance": quote.get("performance") or normalised[ticker]["performance"],
+            }
+    return normalised
+
+
+def _build_price_performance(
+    historie: pd.DataFrame | None,
+    column: str,
+) -> dict[str, dict[str, object]]:
+    empty = {
+        label: {"delta": None, "percentage": None, "tone": "neutral"}
+        for label in (*PRICE_PERFORMANCE_PERIODS.keys(), "YTD")
+    }
+    if historie is None or historie.empty or column not in historie.columns:
+        return empty
+
+    latest = _get_latest_valid_history_point(historie, column)
+    if latest is None:
+        return empty
+
+    latest_date, latest_value = latest
+    performance: dict[str, dict[str, object]] = {}
+    for label, days_back in PRICE_PERFORMANCE_PERIODS.items():
+        target_date = latest_date - pd.Timedelta(days=days_back)
+        performance[label] = _build_performance_entry(
+            latest_value,
+            _get_valid_history_value_on_or_before(historie, column, target_date),
+        )
+
+    performance["YTD"] = _build_performance_entry(
+        latest_value,
+        _get_valid_history_value_on_or_before(historie, column, _ytd_reference_date(latest_date)),
+    )
+    return performance
+
+
+def _build_performance_entry(
+    current_value: float,
+    reference_value: float | None,
+) -> dict[str, object]:
+    if reference_value is None or reference_value == 0:
+        return {"delta": None, "percentage": None, "tone": "neutral"}
+    delta = current_value - reference_value
+    percentage = (delta / reference_value) * 100
+    return {
+        "delta": delta,
+        "percentage": percentage,
+        "tone": _value_tone(delta),
+    }
+
+
+def _get_latest_valid_history_point(
+    historie: pd.DataFrame,
+    column: str,
+) -> tuple[pd.Timestamp, float] | None:
+    series = pd.to_numeric(historie[column], errors="coerce")
+    valid = historie.loc[historie["Datum"].notna() & series.notna() & (series > 0)].copy()
+    if valid.empty:
+        return None
+    valid["_value"] = series.loc[valid.index]
+    row = valid.sort_values("Datum").iloc[-1]
+    return pd.Timestamp(row["Datum"]), float(row["_value"])
+
+
+def _get_valid_history_value_on_or_before(
+    historie: pd.DataFrame,
+    column: str,
+    target_date: pd.Timestamp,
+) -> float | None:
+    series = pd.to_numeric(historie[column], errors="coerce")
+    valid = historie.loc[
+        historie["Datum"].notna()
+        & series.notna()
+        & (series > 0)
+        & (historie["Datum"] <= target_date)
+    ].copy()
+    if valid.empty:
+        return None
+    valid["_value"] = series.loc[valid.index]
+    return float(valid.sort_values("Datum")["_value"].iloc[-1])
+
+
+def _ytd_reference_date(latest_date: pd.Timestamp) -> pd.Timestamp:
+    return pd.Timestamp(year=int(latest_date.year), month=1, day=31)
+
+
+def _value_tone(value: float) -> str:
+    if value > 0:
+        return "positive"
+    if value < 0:
+        return "negative"
+    return "neutral"
 
 
 def build_google_sheets_diagnostics() -> dict[str, str]:
@@ -239,7 +404,8 @@ def parse_historie_sheet(records: Iterable[dict[str, object]]) -> pd.DataFrame:
         for column in HISTORIE_COLUMNS:
             if column == "Datum":
                 continue
-            row[column] = parse_number(_get_cell(record, [column])) or 0.0
+            value = parse_number(_get_cell(record, [column]))
+            row[column] = value if column in PRICE_HISTORY_COLUMNS.values() else value or 0.0
         rows.append(row)
 
     historie = pd.DataFrame(rows, columns=HISTORIE_COLUMNS)
