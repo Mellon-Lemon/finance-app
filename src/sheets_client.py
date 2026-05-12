@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+
+from src.config import get_google_sheet_id, get_secret, get_service_account_info
 
 
 SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets"
+
 TRANSACTION_COLUMNS = [
     "Datum",
     "Ticker",
@@ -25,7 +28,8 @@ class SheetsConfigError(RuntimeError):
 @dataclass(frozen=True)
 class SheetsConfig:
     sheet_id: str
-    service_account_file: Path
+    service_account_file: Path | None = None
+    service_account_info: dict[str, Any] | None = None
 
 
 class GoogleSheetsClient:
@@ -35,26 +39,45 @@ class GoogleSheetsClient:
 
     @classmethod
     def from_environment(cls) -> "GoogleSheetsClient":
-        sheet_id = os.getenv("GOOGLE_SHEET_ID", "").strip()
-        credentials_file = (
-            os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "").strip()
-            or os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
-        )
+        sheet_id = (get_google_sheet_id() or "").strip()
 
         if not sheet_id:
             raise SheetsConfigError("GOOGLE_SHEET_ID ontbreekt.")
+
+        service_account_info = get_service_account_info()
+
+        if service_account_info:
+            return cls(
+                SheetsConfig(
+                    sheet_id=sheet_id,
+                    service_account_info=service_account_info,
+                )
+            )
+
+        credentials_file = (
+            (get_secret("GOOGLE_SERVICE_ACCOUNT_FILE") or "").strip()
+            or (get_secret("GOOGLE_APPLICATION_CREDENTIALS") or "").strip()
+        )
+
         if not credentials_file:
             raise SheetsConfigError(
-                "GOOGLE_SERVICE_ACCOUNT_FILE of GOOGLE_APPLICATION_CREDENTIALS ontbreekt."
+                "Google credentials ontbreken. Gebruik lokaal "
+                "GOOGLE_SERVICE_ACCOUNT_FILE of online GOOGLE_SERVICE_ACCOUNT_JSON."
             )
 
         credentials_path = Path(credentials_file).expanduser()
+
         if not credentials_path.exists():
             raise SheetsConfigError(
                 f"Service account file bestaat niet: {credentials_path}"
             )
 
-        return cls(SheetsConfig(sheet_id=sheet_id, service_account_file=credentials_path))
+        return cls(
+            SheetsConfig(
+                sheet_id=sheet_id,
+                service_account_file=credentials_path,
+            )
+        )
 
     def get_records(self, worksheet_name: str) -> list[dict[str, object]]:
         worksheet = self._get_spreadsheet().worksheet(worksheet_name)
@@ -115,6 +138,7 @@ class GoogleSheetsClient:
             column: _get_by_header(headers, current_values, column)
             for column in TRANSACTION_COLUMNS
         }
+
         for column in TRANSACTION_COLUMNS:
             expected_value = expected_row.get(column, "")
             if _normalise_cell(current_row.get(column, "")) != _normalise_cell(expected_value):
@@ -159,10 +183,19 @@ class GoogleSheetsClient:
                 "Google Sheets dependencies ontbreken. Installeer requirements.txt."
             ) from exc
 
-        credentials = Credentials.from_service_account_file(
-            self._config.service_account_file,
-            scopes=[SHEETS_SCOPE],
-        )
+        if self._config.service_account_info:
+            credentials = Credentials.from_service_account_info(
+                self._config.service_account_info,
+                scopes=[SHEETS_SCOPE],
+            )
+        elif self._config.service_account_file:
+            credentials = Credentials.from_service_account_file(
+                self._config.service_account_file,
+                scopes=[SHEETS_SCOPE],
+            )
+        else:
+            raise SheetsConfigError("Google service account credentials ontbreken.")
+
         return gspread.authorize(credentials).open_by_key(self._config.sheet_id)
 
 
